@@ -1,19 +1,25 @@
 module Infer
 
 open Type
+open TypeContext
 
 type Tyvid = int
 
 type InferCtxt =
-    { tyvars: Map<Tyvid, Type> }
-    static member Default = { tyvars = Map [] }
+    { tyvars: Map<Tyvid, Type>
+      tcx: TyCtxt }
+    static member New tcx =
+        { tyvars = Map []
+          tcx = tcx }
 
+
+let withInferCtxt tcx f = InferCtxt.New tcx |> f
 
 type Infcx<'a> = Infcx of (InferCtxt -> (InferCtxt * 'a))
 
 let runInfcx (Infcx f) x = f x
 
-type TcxBuilder() =
+type InfcxBuilder() =
     member _x.Return x = Infcx(fun tcx -> (tcx, x))
     member _x.ReturnFrom(x) = x
     // f :: 'a -> Tcx<'a>
@@ -30,4 +36,4 @@ type TcxBuilder() =
         Infcx(fun src ->
             let (Infcx g) = f() in g src)
 
-let infcx = TcxBuilder()
+let infcx = InfcxBuilder()

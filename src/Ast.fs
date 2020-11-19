@@ -1,11 +1,14 @@
 module Ast
 
+type NodeId = int
+
 type Span =
     { Lo: int
       Hi: int }
 
 type Expr =
-    { Span: Span
+    { Id: NodeId
+      Span: Span
       Kind: ExprKind }
 
 and ExprKind =

@@ -1,6 +1,8 @@
 ﻿module Main
 
+open Ast
 open Parse
+open Typecheck
 open System.IO
 
 
