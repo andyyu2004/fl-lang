@@ -1,27 +1,35 @@
 module Parse
 
-/// parser monad
-type Parse<'T> = P of (list<char> -> seq<'T * list<char>>)
+open Ast
+
+type ParseError = ParseError
+
+type Parse<'a> = P of (list<char> -> Result<'a * list<char>, ParseError>)
+
+
+let bind f =
+    function
+    | Ok t -> f t
+    | Error err -> Error err
+
+let (>>=) x f = bind f x
 
 module Parsers =
     let bind f (P p) =
         P(fun src ->
-                seq {
-                    for (t, src') in p src do
-                        let (P q) = f t
-                        yield! q src'
-                })
+                p src
+                >>= (fun (t, src') -> let (P q) = f t in q src'))
 
-    let combine (P p) (P q) =
-        P(fun src ->
-                Seq.concat
-                    [ p src
-                      q src ])
 
-    let zero() = P(fun _ -> Seq.empty)
+    (* sequence (>>) in haskell *)
+    (* let combine (P p) (P q) = P(fun src -> p src >>= fun (_, src') -> q src') *)
+    let combine p q = p >>= fun _ -> q
+
+    let zero() = P(fun _ -> Error ParseError)
+
 
 type ParserBuilder() =
-    member _x.Return t = P(fun src -> seq [ t, src ])
+    member _x.Return t = P(fun src -> Ok(t, src))
     member _x.ReturnFrom(p) = p
     member _x.Bind(t, f) = Parsers.bind f t
     member _x.Zero() = Parsers.zero()
@@ -31,7 +39,12 @@ type ParserBuilder() =
 
 let parse = ParserBuilder()
 
-/// combinators
+let parseExpr src = src
+
+(* let integer = P(fun src -> ) *)
+let accept p =
+    P(fun src -> if p src.[0] then Ok(src.[0], src.[1..]) else Error ParseError)
+
 
 let rec many1 p =
     parse {
@@ -40,7 +53,8 @@ let rec many1 p =
         return x :: xs }
 
 and many p =
-    parse {
-        return! many1 p
-        return []
-    }
+    failwith
+        (* parse { *)
+        (*     return! many1 p *)
+        (*     return [] *)
+        (* } *) ""
