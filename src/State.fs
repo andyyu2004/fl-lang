@@ -1,17 +1,17 @@
 module State
 
-type State<'s, 'a> = S of ('s -> ('s * 'a))
+type State<'s, 'a> = S of ('s -> ('a * 's))
 
 let runState (S f) s = f s
 
 
 type StateBuilder() =
-    member _x.Return t = S(fun s -> (s, t))
+    member _x.Return t = S(fun s -> (t, s))
     member _x.ReturnFrom(x) = x
 
     member _x.Bind(t, f) =
         S(fun s ->
-                let (s', t') = runState t s
+                let (t', s') = runState t s
                 runState (f t') s')
 
     member _x.Zero() = failwith ""
@@ -22,4 +22,4 @@ type StateBuilder() =
 let state = StateBuilder()
 
 let get = S(fun s -> (s, s))
-let put s = S(fun _ -> (s, ()))
+let put s = S(fun _ -> ((), s))

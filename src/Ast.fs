@@ -1,14 +1,9 @@
 module Ast
 
-type NodeId = int
+open Lex
 
-type Span =
-    { Lo: int
-      Hi: int }
-
-type Ident =
-    { Symbol: string
-      Span: Span }
+type NodeId =
+    private { inner: int }
 
 (* ast representation of types *)
 

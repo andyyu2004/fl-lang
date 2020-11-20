@@ -1,43 +1,48 @@
 module Parse
 
-open System
+open Result
 open Ast
+open Lex
 
 type ParseError = ParseError
 
+
 type ParseCtxt =
-    { Src: list<char> }
+    { Tokens: list<Token>
+      IdCounter: int }
 
-type Parse<'a> = P of (ParseCtxt -> Result<'a * ParseCtxt, ParseError>)
+(* note the parsectxt is outside the result, so is returned on both error and success *)
+type Parse<'a> = P of (ParseCtxt -> (Result<'a, ParseError> * ParseCtxt))
 
-let private bind f =
-    function
-    | Ok t -> f t
-    | Error err -> Error err
+let runParser (P f) tokens = f tokens
 
 let (>>=) x f = bind f x
 
-module private Parsers =
-    let ret t = P(fun pcx -> Ok(t, pcx))
+let private error err = P(fun pcx -> (Error err, pcx))
 
-    let bind f (P p) =
+module private Parsers =
+    let ret t = P(fun pcx -> (Ok t, pcx))
+
+    let bind (P p) f =
         P(fun pcx ->
-                p pcx
-                >>= (fun (t, pcx') -> let (P q) = f t in q pcx'))
+                let (r, pcx') = p pcx
+                match r with
+                | Error err -> (Error err, pcx')
+                | Ok t -> runParser (f t) pcx')
+
+    (* >>= (fun (t, pcx') -> let (P q) = f t in q pcx')) *)
 
 
     (* sequence (>>) in haskell *)
-    (* let combine (P p) (P q) = P(fun src -> p src >>= fun (_, src') -> q src') *)
+    let combine p q = bind p (fun _ -> q)
 
-    let combine p q = p >>= fun _ -> q
-
-    let zero() = P(fun _ -> Error ParseError)
+    let zero() = P(fun ctx -> (Error ParseError, ctx))
 
 
 type ParserBuilder() =
     member _x.Return t = Parsers.ret t
     member _x.ReturnFrom(p) = p
-    member _x.Bind(t, f) = Parsers.bind f t
+    member _x.Bind(t, f) = Parsers.bind t f
     member _x.Zero() = Parsers.zero()
     member _x.Combine(p, q) = Parsers.combine p q
     member _x.Delay(f) =
@@ -52,22 +57,22 @@ let private parse = ParserBuilder()
 (* let integer = P(fun src -> ) *)
 
 let private accept p =
-    P(fun pctx -> if p pctx.Src.[0] then Ok(pctx.Src.[0], pctx) else Error ParseError)
+    P(fun pctx -> if p pctx.Tokens.[0] then (Ok pctx.Tokens.[0], pctx) else (Error ParseError, pctx))
 
 
 let (<|>) (P p) (P q) =
     P(fun pctx ->
             match p pctx with
-            | Ok(a, pctx') -> Ok(a, pctx')
-            | Error _ -> q pctx)
+            | (Ok a, pctx') -> (Ok a, pctx')
+            | (Error _, pctx') -> q pctx')
 
-let rec private many1 p =
+let rec private many1 p: Parse<list<'a>> =
     parse {
         let! x = p
         let! xs = many p
         return x :: xs }
 
-and private many p = many1 p <|> Parsers.ret []
+and private many p: Parse<list<'a>> = many1 p <|> Parsers.ret []
 
 let rec private sequence =
     function
@@ -83,8 +88,49 @@ let private map f p =
         let! x = p
         return f x }
 
-
 (* parsing logic *)
+
+let get = P(fun pcx -> (Ok pcx, pcx))
+let put pcx = P(fun _ -> (Ok(), pcx))
+
+let private nextId =
+    parse {
+        let! pcx = get
+        let idx = pcx.IdCounter
+        do! put { pcx with IdCounter = 1 + idx }
+        return idx
+    }
+
+
+let private next: Parse<Token> =
+    parse {
+        let! pcx = get
+        match pcx.Tokens with
+        | [] -> return! error ParseError
+        | t :: ts ->
+            do! put { pcx with Tokens = ts }
+            return t
+    }
+
+let private acceptIdent: Parse<Option<Ident>> =
+    parse {
+        let! token = next
+        match token.Kind with
+        | TkIdent ident -> return Some ident
+        | _ -> return None
+    }
+
+let private expectIdent = map Option.get acceptIdent
+let private parseTy: Parse<Type> = failwith ""
+let private parseSig = parseTy
+
+let private parseFunctionItem =
+    parse {
+        let! ident = expectIdent
+        let! signature = parseSig
+        return { Ident = ident
+                 Sig = signature }
+    }
 
 /// <item> = <function-item>
 ///
@@ -98,39 +144,11 @@ let private map f p =
 ///
 /// f :: Int -> Int
 /// f x y = x + y
-
-let private parseChar (c: char) =
-    P(fun pctx ->
-            match pctx.Src with
-            | [] -> Error ParseError
-            | x :: xs ->
-                let pctx' = { pctx with Src = xs }
-                if c = x then Ok(c, pctx') else Error ParseError)
-
-let charsToStr chars = String(List.toArray chars)
-
-let private parseStr str: Parse<string> =
-    str
-    |> List.ofSeq
-    |> List.map parseChar
-    |> sequence
-    |> map charsToStr
-
-let private parseIdent: Parse<Ident> = failwith ""
-
-let private parseTy: Parse<Type> = failwith ""
-
-let private parseSig = parseTy
-
-
-let private parseFunctionItem =
-    parse {
-        let! ident = parseIdent
-        let! signature = parseSig
-        return { Ident = ident
-                 Sig = signature }
-    }
-
 let private parseItem = parseFunctionItem
 
-let private parseProgram = many parseItem
+let private parseProgramInner = many parseItem
+
+let parseProgram tokens =
+    runParser parseProgramInner
+        { Tokens = tokens
+          IdCounter = 0 }
