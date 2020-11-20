@@ -1,6 +1,6 @@
 module Type
 
-type Type =
-    | Int
-    | Bool
-    | Fn of Type * Type
+type Ty =
+    | TyInt
+    | TyBool
+    | TyFn of Ty * Ty

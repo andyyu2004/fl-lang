@@ -4,7 +4,7 @@ open Ast
 open Type
 
 type TyCtxt =
-    { NodeTypes: Map<NodeId, Type> }
+    { NodeTypes: Map<NodeId, Ty> }
     static member Default = { NodeTypes = Map [] }
 
 
@@ -12,8 +12,7 @@ type Tcx<'a> = Tcx of (TyCtxt -> (TyCtxt * 'a))
 
 let runTcx (Tcx f) x = f x
 
-let execTcx tcx x =
-    let (tyctx, _) = runTcx tcx x in tyctx
+let execTcx tcx x = runTcx tcx x |> fst
 
 type TcxBuilder() =
     member _x.Return x = Tcx(fun tcx -> (tcx, x))

@@ -6,11 +6,9 @@ open TypeContext
 type Tyvid = int
 
 type InferCtxt =
-    { tyvars: Map<Tyvid, Type>
-      tcx: TyCtxt }
-    static member New tcx =
-        { tyvars = Map []
-          tcx = tcx }
+    { Tyvars: Map<Tyvid, Ty>
+      Tcx: TyCtxt }
+    static member New tcx = { Tyvars = Map []; Tcx = tcx }
 
 
 let withInferCtxt tcx f = InferCtxt.New tcx |> f
@@ -32,8 +30,8 @@ type InfcxBuilder() =
 
     member _x.Zero() = failwith ""
     member _x.Combine(p, q) = failwith ""
+
     member _x.Delay(f) =
-        Infcx(fun src ->
-            let (Infcx g) = f() in g src)
+        Infcx(fun src -> let (Infcx g) = f () in g src)
 
 let infcx = InfcxBuilder()

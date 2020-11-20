@@ -1,16 +1,15 @@
 ﻿module Main
 
-open Ast
-open Parse
-open Typecheck
 open System.IO
+open Lex
 
 
 
 
 [<EntryPoint>]
 let main argv =
-    let src = File.ReadAllText(argv.[0])
-    Parse.parseExpr src |> ignore
-
+    let src = File.ReadAllText(argv.[0]) |> Seq.toList
+    (* Parse.parseProgram src |> ignore *)
+    let tokens = lexProgram src
+    printfn "%A" tokens
     0
