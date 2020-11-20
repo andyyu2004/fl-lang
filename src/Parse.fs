@@ -1,15 +1,17 @@
 module Parse
 
+open Format
 open Result
 open Ast
 open Lex
 
-type ParseError = ParseError
 
+type ParseError = ParseError
 
 type ParseCtxt =
     { Tokens: list<Token>
       IdCounter: int }
+
 
 (* note the parsectxt is outside the result, so is returned on both error and success *)
 type Parse<'a> = P of (ParseCtxt -> (Result<'a, ParseError> * ParseCtxt))
@@ -18,7 +20,9 @@ let runParser (P f) tokens = f tokens
 
 let (>>=) x f = bind f x
 
+
 let private error err = P(fun pcx -> (Error err, pcx))
+
 
 module private Parsers =
     let ret t = P(fun pcx -> (Ok t, pcx))
@@ -27,8 +31,8 @@ module private Parsers =
         P(fun pcx ->
                 let (r, pcx') = p pcx
                 match r with
-                | Error err -> (Error err, pcx')
-                | Ok t -> runParser (f t) pcx')
+                | Ok t -> runParser (f t) pcx'
+                | Error err -> (Error err, pcx'))
 
     (* >>= (fun (t, pcx') -> let (P q) = f t in q pcx')) *)
 
@@ -50,14 +54,16 @@ type ParserBuilder() =
 
 let private parse = ParserBuilder()
 
+let (<*>) f x =
+    parse {
+        let! f = f
+        let! x = x
+        return f x }
 
 (* combinators *)
 
 
 (* let integer = P(fun src -> ) *)
-
-let private accept p =
-    P(fun pctx -> if p pctx.Tokens.[0] then (Ok pctx.Tokens.[0], pctx) else (Error ParseError, pctx))
 
 
 let (<|>) (P p) (P q) =
@@ -93,14 +99,6 @@ let private map f p =
 let get = P(fun pcx -> (Ok pcx, pcx))
 let put pcx = P(fun _ -> (Ok(), pcx))
 
-let private nextId =
-    parse {
-        let! pcx = get
-        let idx = pcx.IdCounter
-        do! put { pcx with IdCounter = 1 + idx }
-        return idx
-    }
-
 
 let private next: Parse<Token> =
     parse {
@@ -112,6 +110,36 @@ let private next: Parse<Token> =
             return t
     }
 
+let private accept kind: Parse<Option<Token>> =
+    parse {
+        let! pcx = get
+        match pcx.Tokens with
+        | [] -> return None
+        | t :: ts ->
+            if t.Kind = kind then
+                do! put { pcx with Tokens = ts }
+                return Some t
+            else
+                return None
+    }
+
+let private expect kind: Parse<Token> =
+    parse {
+        match! accept kind with
+        | Some token -> return token
+        | None -> return! error ParseError
+    }
+
+let private nextId: Parse<NodeId> =
+    parse {
+        let! pcx = get
+        let idx = pcx.IdCounter
+        do! put { pcx with IdCounter = 1 + idx }
+        return { Id = idx }
+    }
+
+
+
 let private acceptIdent: Parse<Option<Ident>> =
     parse {
         let! token = next
@@ -120,16 +148,55 @@ let private acceptIdent: Parse<Option<Ident>> =
         | _ -> return None
     }
 
-let private expectIdent = map Option.get acceptIdent
-let private parseTy: Parse<Type> = failwith ""
+let private expectIdent =
+    parse {
+        match! acceptIdent with
+        | Some ident -> return ident
+        | None -> return! error ParseError
+    }
+
+let private parsePathSegment: Parse<PathSegment> =
+    parse {
+        let! ident = expectIdent
+        return { Ident = ident } }
+
+let private parsePathTy =
+    parse {
+        let! segment = parsePathSegment
+        let path = { Segments = [ segment ] }
+        return AstTyPath path
+    }
+
+#nowarn "40"
+
+let rec private parseTy: Parse<Type> =
+    parse {
+        // use the <|> combinator to parse all the potential different types
+        let! ty = parsePathTy
+        match! accept TkRArrow with
+        | None -> return ty
+        | Some _ ->
+            let! rty = parseTy
+            return AstTyFn(ty, rty)
+    }
+
 let private parseSig = parseTy
 
 let private parseFunctionItem =
     parse {
         let! ident = expectIdent
+        let! _ = expect TkDColon
         let! signature = parseSig
         return { Ident = ident
                  Sig = signature }
+    }
+
+let private mkItem span kind: Parse<Item> =
+    parse {
+        let! idx = nextId
+        return { Id = idx
+                 Span = span
+                 Kind = kind }
     }
 
 /// <item> = <function-item>
@@ -144,11 +211,24 @@ let private parseFunctionItem =
 ///
 /// f :: Int -> Int
 /// f x y = x + y
-let private parseItem = parseFunctionItem
 
-let private parseProgramInner = many parseItem
+let private parseItem: Parse<Item> =
+    parse {
+        let! fnItem = parseFunctionItem
+        let span =
+            { Lo = 0
+              Hi = 0 }
+        return! mkItem span (ItemFn fnItem)
+    }
+
+(* top level ast parse function *)
+let private parseProgramInner: Parse<Ast> =
+    parse {
+        let! items = many parseItem
+        return { Items = items } }
 
 let parseProgram tokens =
     runParser parseProgramInner
         { Tokens = tokens
           IdCounter = 0 }
+    |> fst

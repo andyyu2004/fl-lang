@@ -2,6 +2,7 @@ module Lex
 
 open System
 open State
+open Format
 
 type Span =
     { Lo: int
@@ -10,12 +11,16 @@ type Span =
 type Ident =
     { Symbol: string
       Span: Span }
+    interface IShow with
+        member this.Show() = this.Symbol
 
 type TokenKind =
     | TkIdent of Ident
     | TkInt of int
     | TkLParen
     | TkRParen
+    | TkRArrow
+    | TkRFArrow
     | TkDColon
     | TkPlus
     | TkMinus
@@ -79,6 +84,8 @@ let rec lexer =
         match! source with
         | [] -> return []
         | ':' :: ':' :: xs -> return! addTok TkDColon xs
+        | '-' :: '>' :: xs -> return! addTok TkRArrow xs
+        | '=' :: '>' :: xs -> return! addTok TkRFArrow xs
         | '(' :: xs -> return! addTok TkLParen xs
         | ')' :: xs -> return! addTok TkRParen xs
         | '+' :: xs -> return! addTok TkPlus xs

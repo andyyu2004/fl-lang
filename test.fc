@@ -1,1 +1,3 @@
-+ - () :: 5559 hello :: world
+test :: Int
+
+f :: Int -> Bool -> Int
