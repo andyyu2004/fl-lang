@@ -33,6 +33,7 @@ type TokenKind =
     | TkMinus
     | TkStar
     | TkSlash
+    | TkBang
 
 
 type Token =
@@ -124,6 +125,7 @@ let rec lexer =
         | '-' :: '>' :: xs -> return! addTok TkRArrow xs
         | '=' :: '>' :: xs -> return! addTok TkRFArrow xs
         | '=' :: xs -> return! addTok TkEq xs
+        | '!' :: xs -> return! addTok TkBang xs
         | '(' :: xs -> return! addTok TkLParen xs
         | ')' :: xs -> return! addTok TkRParen xs
         | '+' :: xs -> return! addTok TkPlus xs

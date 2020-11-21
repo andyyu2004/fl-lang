@@ -17,6 +17,7 @@
     <Compile Include="src/TypeContext.fs" />
     <Compile Include="src/Infer.fs" />
     <Compile Include="src/Typecheck.fs" />
+    <Compile Include="src/Eval.fs" />
 
     <Compile Include="src/Program.fs" />
   </ItemGroup>

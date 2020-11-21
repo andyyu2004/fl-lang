@@ -245,17 +245,33 @@ let rec private parseAssoc' ops (p: Parse<Expr>) (l: Expr): Parse<Expr> =
             return l
     }
 
-let private parseAssoc ops p: Parse<Expr> =
+let private parseAssoc ops p =
     parse {
         let! left = p
         return! parseAssoc' ops p left }
+
 
 
 let rec private parseExpr: Parse<Expr> = parseTerm
 
 and parseTerm = parseAssoc [ TkPlus; TkMinus ] parseFactor
 
-and parseFactor = parseAssoc [ TkStar; TkSlash ] parsePrimary
+and parseFactor = parseAssoc [ TkStar; TkSlash ] parseUnary
+
+and parseUnary =
+    parse {
+        let! token = acceptOneOf [ TkMinus; TkBang ]
+        match token with
+        | Some token ->
+            let unop = UnOp.FromToken token.Kind
+            let! expr = parseUnary
+            let span = token.Span ++ expr.Span
+            let kind = ExprUnary(unop, expr)
+            return! mkExpr span kind
+        | None -> return! parsePrimary
+    }
+
+and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr
 
 and parseGroupExpr =
     parse {
@@ -263,8 +279,6 @@ and parseGroupExpr =
         let! expr = parseExpr
         let! _ = expect TkRParen
         return expr }
-
-and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr
 
 and parseLiteralExpr =
     parse {

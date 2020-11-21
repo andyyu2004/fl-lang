@@ -10,6 +10,7 @@ let rec typecheck (expr: Expr) =
     tcx {
         let! ty = match expr.Kind with
                   | ExprBin(op, l, r) -> typecheckAdd expr l r
+                  | ExprUnary(op, operand) -> failwith ""
                   | ExprLit _lit -> failwith ""
         do! recordTy expr.Id ty
         return ty

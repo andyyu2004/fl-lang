@@ -21,6 +21,22 @@ type Lit =
     interface IShow with
         member this.Show() = show this.Kind
 
+type UnOp =
+    | UnOpNeg
+    | UnOpNot
+
+    static member FromToken =
+        function
+        | TkMinus -> UnOpNeg
+        | TkBang -> UnOpNot
+        | _ -> failwith "invalid unop"
+
+    interface IShow with
+        member this.Show() =
+            match this with
+            | UnOpNeg -> "-"
+            | UnOpNot -> "!"
+
 type BinOp =
     | BinOpAdd
     | BinOpSub
@@ -53,12 +69,14 @@ type Expr =
 
 and ExprKind =
     | ExprLit of Lit
+    | ExprUnary of UnOp * Expr
     | ExprBin of BinOp * Expr * Expr
 
     interface IShow with
         member this.Show() =
             match this with
             | ExprLit lit -> sprintf "%s" (show lit)
+            | ExprUnary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
             | ExprBin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
 
 type PathSegment =

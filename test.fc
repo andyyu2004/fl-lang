@@ -2,4 +2,4 @@ test :: Int
 test = 5 + 3 * 9 + 8 - 88 / 888
 
 f :: Int -> Bool -> Int
-test = 5
+test = -5 + 3
