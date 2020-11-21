@@ -120,6 +120,7 @@ let private next: Parse<Token> =
             return t
     }
 
+
 let private accept kind: Parse<Option<Token>> =
     parse {
         let! pcx = get
@@ -131,6 +132,16 @@ let private accept kind: Parse<Option<Token>> =
                 return Some t
             else
                 return None
+    }
+
+let rec private acceptOneOf kinds: Parse<Option<Token>> =
+    parse {
+        match kinds with
+        | [] -> return None
+        | kind :: kinds ->
+            match! accept kind with
+            | Some token -> return Some token
+            | None -> return! acceptOneOf kinds
     }
 
 let private expect kind: Parse<Token> =
@@ -222,21 +233,40 @@ let private parseLiteralInt: Parse<Lit> =
 
 let rec private parseExpr: Parse<Expr> = parseTerm
 
-(* return! parseTerm' left *)
 and parseTerm =
     parse {
-        let! left = parsePrimary
+        let! left = parseFactor
         return! parseTerm' left }
 
-and parseTerm' (l: Expr): Parse<Expr> =
+and parseTerm' l =
     parse {
-        let! plus = accept TkPlus
-        if Option.isSome plus then
-            let! r = parsePrimary
+        let! token = acceptOneOf [ TkPlus; TkMinus ]
+        if Option.isSome token then
+            let binop = token.Value.Kind |> BinOp.FromToken
+            let! r = parseFactor
             let span = l.Span ++ r.Span
-            let kind = ExprBin(BinOpAdd, l, r)
+            let kind = ExprBin(binop, l, r)
             let! expr = mkExpr span kind
             return! parseTerm' expr
+        else
+            return l
+    }
+
+and parseFactor: Parse<Expr> =
+    parse {
+        let! left = parsePrimary
+        return! parseFactor' left }
+
+and parseFactor' l =
+    parse {
+        let! token = acceptOneOf [ TkStar; TkSlash ]
+        if Option.isSome token then
+            let binop = token.Value.Kind |> BinOp.FromToken
+            let! r = parsePrimary
+            let span = l.Span ++ r.Span
+            let kind = ExprBin(binop, l, r)
+            let! expr = mkExpr span kind
+            return! parseFactor' expr
         else
             return l
     }
@@ -258,9 +288,6 @@ and parseLiteralExpr =
 
         return! mkExpr lit.Span kind
     }
-
-
-
 
 let private parseSig = parseTy
 

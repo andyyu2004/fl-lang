@@ -27,6 +27,14 @@ type BinOp =
     | BinOpMul
     | BinOpDiv
 
+    static member FromToken =
+        function
+        | TkPlus -> BinOpAdd
+        | TkMinus -> BinOpSub
+        | TkStar -> BinOpMul
+        | TkSlash -> BinOpDiv
+        | _ -> failwith "invalid binop"
+
     interface IShow with
         member this.Show() =
             match this with

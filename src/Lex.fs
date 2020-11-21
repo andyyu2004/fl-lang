@@ -32,6 +32,7 @@ type TokenKind =
     | TkPlus
     | TkMinus
     | TkStar
+    | TkSlash
 
 
 type Token =
@@ -128,6 +129,7 @@ let rec lexer =
         | '+' :: xs -> return! addTok TkPlus xs
         | '-' :: xs -> return! addTok TkMinus xs
         | '*' :: xs -> return! addTok TkStar xs
+        | '/' :: xs -> return! addTok TkSlash xs
         | (' '
         | '\t'
         | '\n') :: xs -> return! withSrc xs
