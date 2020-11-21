@@ -34,6 +34,7 @@ type TokenKind =
     | TkStar
     | TkSlash
     | TkBang
+    | TkComma
 
 
 type Token =
@@ -76,7 +77,6 @@ let index =
 
 let setSrc src =
     lex {
-
         let! lcx = get
         do! put
                 { lcx with
@@ -116,11 +116,23 @@ let rec withSpan f =
         return (span, r)
     }
 
+let rec skipLine =
+    lex {
+        match! source with
+        | [] -> return ()
+        | '\n' :: xs -> return! setSrc xs
+        | _ :: xs ->
+            do! setSrc xs
+            return! skipLine
+    }
 
 let rec lexer =
     lex {
         match! source with
         | [] -> return []
+        | '/' :: '/' :: _ ->
+            do! skipLine
+            return! lexer
         | ':' :: ':' :: xs -> return! addTok TkDColon xs
         | '-' :: '>' :: xs -> return! addTok TkRArrow xs
         | '=' :: '>' :: xs -> return! addTok TkRFArrow xs
@@ -132,6 +144,7 @@ let rec lexer =
         | '-' :: xs -> return! addTok TkMinus xs
         | '*' :: xs -> return! addTok TkStar xs
         | '/' :: xs -> return! addTok TkSlash xs
+        | ',' :: xs -> return! addTok TkComma xs
         | (' '
         | '\t'
         | '\n') :: xs -> return! withSrc xs

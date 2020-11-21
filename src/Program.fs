@@ -10,11 +10,8 @@ open Parse
 let main argv =
     let src = File.ReadAllText(argv.[0]) |> Seq.toList
     let tokens = lexProgram src
-    printfn "%A" tokens
     let ast = parseProgram tokens
     match ast with
-    | Ok ast ->
-        printfn "%A" ast
-        printfn "%s" (show ast)
-    | _ -> ()
+    | Ok ast -> printfn "%s" (show ast)
+    | Error _err -> printfn "parse error"
     0

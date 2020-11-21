@@ -1,5 +1,8 @@
-test :: Int
-test = 5 + 3 * 9 + 8 - 88 / 888
+// test :: Int
+// test = 5 + 3 * 9 + 8 - 88 / 888
 
-f :: Int -> Bool -> Int
-test = -5 + 3
+// f :: Int -> Bool -> Int
+// f = -(5 + 3)
+
+tuple :: (Int, Bool)
+tuple = (5, 6)

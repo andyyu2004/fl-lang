@@ -69,15 +69,28 @@ type Expr =
 
 and ExprKind =
     | ExprLit of Lit
+    | ExprGroup of Expr
     | ExprUnary of UnOp * Expr
     | ExprBin of BinOp * Expr * Expr
+    | ExprTuple of list<Expr>
 
     interface IShow with
         member this.Show() =
             match this with
             | ExprLit lit -> sprintf "%s" (show lit)
+            | ExprGroup expr -> sprintf "(%s)" (show expr)
             | ExprUnary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
             | ExprBin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
+            | ExprTuple(xs) -> sprintf "(%s)" (showList xs ",")
+
+type Pat =
+    { Id: NodeId
+      Span: Span
+      Kind: PatKind }
+
+and PatKind =
+    | PatBind of Ident
+    | PatGroup of Pat
 
 type PathSegment =
     { Ident: Ident }
@@ -87,15 +100,26 @@ type PathSegment =
 
 
 type Path =
-    { Segments: list<PathSegment> }
+    { Span: Span
+      Segments: list<PathSegment> }
     interface IShow with
         member this.Show() = showList this.Segments "::"
 
 
 (* ast representation of types; not to be confused with `Ty` *)
+// todo
 type Type =
+    { Id: NodeId
+      Span: Span
+      Kind: TypeKind }
+
+    interface IShow with
+        member this.Show() = show this.Kind
+
+and TypeKind =
     | AstTyInt
     | AstTyBool
+    | AstTyTuple of list<Type>
     | AstTyPath of Path
     | AstTyFn of Type * Type
 
@@ -104,12 +128,10 @@ type Type =
             match this with
             | AstTyInt -> "int"
             | AstTyBool -> "bool"
+            | AstTyTuple tys -> sprintf "(%s)" (showList tys ",")
             | AstTyPath path -> (path :> IShow).Show()
             | AstTyFn(t, u) -> sprintf "(%s -> %s)" (show t) (show u)
 
-// todo
-type TypeKind =
-    { Kind: Type }
 
 (* type signature *)
 type Sig = Type

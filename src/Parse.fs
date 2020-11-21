@@ -8,6 +8,7 @@ open Lex
 
 type ParseError = ParseError
 
+
 type ParseCtxt =
     { Tokens: list<Token>
       IdCounter: int }
@@ -66,11 +67,21 @@ let (<*>) f x =
 (* let integer = P(fun src -> ) *)
 
 
+/// the `or` parser combinator
+// note the intentional choice return `q pctx` instead of `q pctx'`
+// on error
+// this allows this combinator to be used as a backtrack over multiple options
 let (<|>) (P p) (P q) =
     P(fun pctx ->
             match p pctx with
             | (Ok a, pctx') -> (Ok a, pctx')
-            | (Error _, pctx') -> q pctx')
+            | (Error _, _pctx') -> q pctx)
+
+let (>*>) p q =
+    parse {
+        let! _ = p
+        return! q }
+
 
 let rec private many1 p: Parse<list<'a>> =
     parse {
@@ -79,6 +90,24 @@ let rec private many1 p: Parse<list<'a>> =
         return x :: xs }
 
 and private many p: Parse<list<'a>> = many1 p <|> Parsers.ret []
+
+/// parsers `p` if it can; always returns ()
+let optional p: Parse<unit> =
+    parse {
+        let! _ = p
+        return () } <|> parse { return () }
+
+
+let rec private sepBy p sep = sepBy1 p sep <|> parse { return [] }
+
+and private sepBy1 p sep =
+    parse {
+        let! x = p
+        let! xs = many (sep >*> p)
+        do! optional sep
+        // parse trailing separator
+        return x :: xs
+    }
 
 let rec private sequence =
     function
@@ -134,6 +163,7 @@ let private accept kind: Parse<Option<Token>> =
                 return None
     }
 
+
 let rec private acceptOneOf kinds: Parse<Option<Token>> =
     parse {
         match kinds with
@@ -167,6 +197,13 @@ let private acceptIdent: Parse<Option<Ident>> =
         | _ -> return None
     }
 
+let rec private parseToken tk =
+    parse {
+        let! _ = expect tk
+        return () }
+
+let private parseTuple p = parse { return! sepBy1 p <| parseToken TkComma }
+
 let private expectIdent =
     parse {
         match! acceptIdent with
@@ -189,6 +226,14 @@ let private expectInt =
         | None -> return! error ParseError
     }
 
+let private mkTy span kind: Parse<Type> =
+    parse {
+        let! idx = nextId
+        return { Id = idx
+                 Span = span
+                 Kind = kind }
+    }
+
 let private parsePathSegment: Parse<PathSegment> =
     parse {
         let! ident = expectIdent
@@ -197,21 +242,40 @@ let private parsePathSegment: Parse<PathSegment> =
 let private parsePathTy =
     parse {
         let! segment = parsePathSegment
-        let path = { Segments = [ segment ] }
-        return AstTyPath path
+        let span = segment.Ident.Span
+
+        let path =
+            { Segments = [ segment ]
+              Span = span }
+
+        let kind = AstTyPath path
+        return! mkTy span kind
     }
 
 #nowarn "40"
 
+
 let rec private parseTy: Parse<Type> =
     parse {
         // use the <|> combinator to parse all the potential different types
-        let! ty = parsePathTy
+        let! ty = parsePathTy <|> parseTupleTy
         match! accept TkRArrow with
         | None -> return ty
         | Some _ ->
             let! rty = parseTy
-            return AstTyFn(ty, rty)
+            let span = ty.Span ++ rty.Span
+            let kind = AstTyFn(ty, rty)
+            return! mkTy span kind
+    }
+
+and parseTupleTy =
+    parse {
+        let! l = expect TkLParen
+        let! tys = parseTuple parseTy
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        let kind = AstTyTuple tys
+        return! mkTy span kind
     }
 
 let rec mkExpr span kind: Parse<Expr> =
@@ -271,14 +335,28 @@ and parseUnary =
         | None -> return! parsePrimary
     }
 
-and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr
+// note we must parse group before tuple as `( <expr> )` should be parsed as a group not a tuple
+and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr <|> parseTupleExpr
+
+and parseTupleExpr =
+    parse {
+        let! l = expect TkLParen
+        let! exprs = parseTuple parseExpr
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        let kind = ExprTuple exprs
+        return! mkExpr span kind
+    }
 
 and parseGroupExpr =
     parse {
-        let! _ = expect TkLParen
+        let! l = expect TkLParen
         let! expr = parseExpr
-        let! _ = expect TkRParen
-        return expr }
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        let kind = ExprGroup expr
+        return! mkExpr span kind
+    }
 
 and parseLiteralExpr =
     parse {
@@ -297,7 +375,7 @@ let private parseFnDef =
     parse {
         let! ident = expectIdent
         // params
-        let! _ = expect TkEq
+        do! parseToken TkEq
         let! body = parseExpr
         let span = ident.Span ++ body.Span
         return { Ident = ident
@@ -309,7 +387,7 @@ let private parseFnDef =
 let private parseFnItem =
     parse {
         let! ident = expectIdent
-        let! _ = expect TkDColon
+        do! parseToken TkDColon
         let! signature = parseSig
         let! def = parseFnDef
         let span = ident.Span ++ def.Span
