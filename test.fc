@@ -1,3 +1,5 @@
 test :: Int
+test = 5 + 3 + 8
 
 f :: Int -> Bool -> Int
+test = 5

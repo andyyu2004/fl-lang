@@ -6,7 +6,52 @@ open Format
 type NodeId =
     { Id: int }
 
-(* ast representation of types *)
+type LitKind =
+    | LitInt of int
+    | LitBool of bool
+    interface IShow with
+        member this.Show() =
+            match this with
+            | LitInt i -> sprintf "%d" i
+            | LitBool b -> sprintf "%b" b
+
+type Lit =
+    { Span: Span
+      Kind: LitKind }
+    interface IShow with
+        member this.Show() = show this.Kind
+
+type BinOp =
+    | BinOpAdd
+    | BinOpSub
+    | BinOpMul
+    | BinOpDiv
+
+    interface IShow with
+        member this.Show() =
+            match this with
+            | BinOpAdd -> "+"
+            | BinOpSub -> "-"
+            | BinOpMul -> "*"
+            | BinOpDiv -> "/"
+
+type Expr =
+    { Id: NodeId
+      Span: Span
+      Kind: ExprKind }
+
+    interface IShow with
+        member this.Show() = show this.Kind
+
+and ExprKind =
+    | ExprLit of Lit
+    | ExprBin of BinOp * Expr * Expr
+
+    interface IShow with
+        member this.Show() =
+            match this with
+            | ExprLit lit -> sprintf "%s" (show lit)
+            | ExprBin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
 
 type PathSegment =
     { Ident: Ident }
@@ -20,6 +65,8 @@ type Path =
     interface IShow with
         member this.Show() = showList this.Segments "::"
 
+
+(* ast representation of types; not to be confused with `Ty` *)
 type Type =
     | AstTyInt
     | AstTyBool
@@ -34,18 +81,33 @@ type Type =
             | AstTyPath path -> (path :> IShow).Show()
             | AstTyFn(t, u) -> sprintf "(%s -> %s)" (show t) (show u)
 
+// todo
+type TypeKind =
+    { Kind: Type }
+
 (* type signature *)
 type Sig = Type
 
-type FunctionItem =
+type FnDef =
     { Ident: Ident
-      Sig: Sig }
+      Span: Span
+      Params: list<unit>
+      Body: Expr }
     interface IShow with
-        member this.Show() = sprintf "%s :: %s" (show this.Ident) (show this.Sig)
+        member this.Show() = sprintf "%s %s = %s" (show this.Ident) "<params>" (show this.Body)
+
+type FnItem =
+    { Ident: Ident
+      Span: Span
+      Sig: Sig
+      Def: FnDef }
+    interface IShow with
+        member this.Show() =
+            sprintf "%s :: %s\n%s" (show this.Ident) (show this.Sig) (show this.Def)
 
 
 type ItemKind =
-    | ItemFn of FunctionItem
+    | ItemFn of FnItem
 
     interface IShow with
         member this.Show() =
@@ -61,15 +123,6 @@ type Item =
     interface IShow with
         member this.Show() = show this.Kind
 
-
-type Expr =
-    { Id: NodeId
-      Span: Span
-      Kind: ExprKind }
-
-and ExprKind =
-    | ExprNum of int
-    | ExprAdd of Expr * Expr
 
 type Ast =
     { Items: list<Item> }

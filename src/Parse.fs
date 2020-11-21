@@ -100,6 +100,16 @@ let get = P(fun pcx -> (Ok pcx, pcx))
 let put pcx = P(fun _ -> (Ok(), pcx))
 
 
+let private tokens =
+    parse {
+        let! pcx = get
+        return pcx.Tokens }
+
+let private currSpan =
+    parse {
+        let! t = tokens
+        return t.[0].Span }
+
 let private next: Parse<Token> =
     parse {
         let! pcx = get
@@ -138,8 +148,6 @@ let private nextId: Parse<NodeId> =
         return { Id = idx }
     }
 
-
-
 let private acceptIdent: Parse<Option<Ident>> =
     parse {
         let! token = next
@@ -152,6 +160,21 @@ let private expectIdent =
     parse {
         match! acceptIdent with
         | Some ident -> return ident
+        | None -> return! error ParseError
+    }
+
+let private acceptInt: Parse<Option<int>> =
+    parse {
+        let! token = next
+        match token.Kind with
+        | TkInt i -> return Some i
+        | _ -> return None
+    }
+
+let private expectInt =
+    parse {
+        match! acceptInt with
+        | Some i -> return i
         | None -> return! error ParseError
     }
 
@@ -180,15 +203,93 @@ let rec private parseTy: Parse<Type> =
             return AstTyFn(ty, rty)
     }
 
+let rec mkExpr span kind: Parse<Expr> =
+    parse {
+        let! idx = nextId
+        return { Id = idx
+                 Span = span
+                 Kind = kind }
+    }
+
+(* let private parseLiteralBool = failwith "" *)
+let private parseLiteralInt: Parse<Lit> =
+    parse {
+        let! span = currSpan
+        let! i = expectInt
+        return { Span = span
+                 Kind = LitInt i }
+    }
+
+let rec private parseExpr: Parse<Expr> = parseTerm
+
+(* return! parseTerm' left *)
+and parseTerm =
+    parse {
+        let! left = parsePrimary
+        return! parseTerm' left }
+
+and parseTerm' (l: Expr): Parse<Expr> =
+    parse {
+        let! plus = accept TkPlus
+        if Option.isSome plus then
+            let! r = parsePrimary
+            let span = l.Span ++ r.Span
+            let kind = ExprBin(BinOpAdd, l, r)
+            let! expr = mkExpr span kind
+            return! parseTerm' expr
+        else
+            return l
+    }
+
+and parseGroupExpr =
+    parse {
+        let! _ = expect TkLParen
+        let! expr = parseExpr
+        let! _ = expect TkRParen
+        return expr }
+
+and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr
+
+and parseLiteralExpr =
+    parse {
+        (* let! lit = (parseLiteralInt <|> parseLiteralBool) *)
+        let! lit = parseLiteralInt
+        let kind = ExprLit lit
+
+        return! mkExpr lit.Span kind
+    }
+
+
+
+
 let private parseSig = parseTy
 
-let private parseFunctionItem =
+(* let private parseFnItem = parse {  } *)
+
+let private parseFnDef =
+    parse {
+        let! ident = expectIdent
+        // params
+        let! _ = expect TkEq
+        let! body = parseExpr
+        let span = ident.Span ++ body.Span
+        return { Ident = ident
+                 Span = span
+                 Params = []
+                 Body = body }
+    }
+
+let private parseFnItem =
     parse {
         let! ident = expectIdent
         let! _ = expect TkDColon
         let! signature = parseSig
+        let! def = parseFnDef
+        let span = ident.Span ++ def.Span
         return { Ident = ident
-                 Sig = signature }
+                 Span = span
+                 Sig = signature
+                 Def = def }
     }
 
 let private mkItem span kind: Parse<Item> =
@@ -214,12 +315,8 @@ let private mkItem span kind: Parse<Item> =
 
 let private parseItem: Parse<Item> =
     parse {
-        let! fnItem = parseFunctionItem
-        let span =
-            { Lo = 0
-              Hi = 0 }
-        return! mkItem span (ItemFn fnItem)
-    }
+        let! fnItem = parseFnItem
+        return! mkItem fnItem.Span (ItemFn fnItem) }
 
 (* top level ast parse function *)
 let private parseProgramInner: Parse<Ast> =

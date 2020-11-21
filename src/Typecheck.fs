@@ -6,11 +6,11 @@ open Type
 open TypeContext
 
 
-let rec typecheck expr =
+let rec typecheck (expr: Expr) =
     tcx {
         let! ty = match expr.Kind with
-                  | ExprNum _ -> tcx { return TyInt }
-                  | ExprAdd(l, r) -> typecheckAdd expr l r
+                  | ExprBin(op, l, r) -> typecheckAdd expr l r
+                  | ExprLit _lit -> failwith ""
         do! recordTy expr.Id ty
         return ty
     }

@@ -8,15 +8,22 @@ type Span =
     { Lo: int
       Hi: int }
 
+let (++) s t =
+    { Lo = min s.Lo t.Lo
+      Hi = max s.Hi t.Hi }
+
+
 type Ident =
     { Symbol: string
       Span: Span }
+
     interface IShow with
         member this.Show() = this.Symbol
 
 type TokenKind =
     | TkIdent of Ident
     | TkInt of int
+    | TkEq
     | TkLParen
     | TkRParen
     | TkRArrow
@@ -28,11 +35,16 @@ type TokenKind =
 
 
 type Token =
-    { Kind: TokenKind }
+    { Span: Span
+      Kind: TokenKind }
 
 type LexCtxt =
-    { Src: list<char> }
-    static member Default src = { Src = src }
+    { Src: list<char>
+      Index: int }
+
+    static member Default src =
+        { Src = src
+          Index = 0 }
 
 
 type private Lex<'a> = State<LexCtxt, 'a>
@@ -49,13 +61,26 @@ let private source =
 
 #nowarn "40"
 
-let mkTok kind = lex { return { Kind = kind } }
+let mkTok span kind =
+    lex {
+        return { Span = span
+                 Kind = kind }
+    }
+
+let index =
+    lex {
+        let! lcx = get
+        return lcx.Index }
 
 let setSrc src =
     lex {
 
         let! lcx = get
-        do! put { lcx with Src = src } }
+        do! put
+                { lcx with
+                      Src = src
+                      Index = lcx.Index + (lcx.Src.Length - src.Length) }
+    }
 
 let rec lexWhileInner p =
     lex {
@@ -78,6 +103,17 @@ let rec lexIntInner = lexWhile Char.IsDigit
 
 let rec lexIdentInner = lexWhile Char.IsLetter
 
+let rec withSpan f =
+    lex {
+        let! lo = index
+        let! r = f
+        let! hi = index
+        let span =
+            { Lo = lo
+              Hi = hi }
+        return (span, r)
+    }
+
 
 let rec lexer =
     lex {
@@ -86,6 +122,7 @@ let rec lexer =
         | ':' :: ':' :: xs -> return! addTok TkDColon xs
         | '-' :: '>' :: xs -> return! addTok TkRArrow xs
         | '=' :: '>' :: xs -> return! addTok TkRFArrow xs
+        | '=' :: xs -> return! addTok TkEq xs
         | '(' :: xs -> return! addTok TkLParen xs
         | ')' :: xs -> return! addTok TkRParen xs
         | '+' :: xs -> return! addTok TkPlus xs
@@ -102,22 +139,21 @@ let rec lexer =
 
 and lexIdent =
     lex {
-        let! ident = lexIdentInner
-        let! token = mkTok
+        let! (span, ident) = withSpan lexIdentInner
+        let! token = mkTok span
                          (TkIdent
                              { Symbol = ident
-                               Span =
-                                   { Lo = 0
-                                     Hi = 0 } })
+                               Span = span })
         let! tokens = lexer
         return token :: tokens
     }
 
 and lexInt =
     lex {
-        let! str = lexIntInner
+        let! (span, str) = withSpan lexIntInner
         let i = int str
-        let! token = mkTok (TkInt i)
+
+        let! token = mkTok span (TkInt i)
         let! tokens = lexer
         return token :: tokens
     }
@@ -125,9 +161,16 @@ and lexInt =
 
 and addTok kind src =
     lex {
-        let! token = mkTok kind
-        let! tokens = withSrc src
-        return token :: tokens }
+        let! lo = index
+        do! setSrc src
+        let! hi = index
+        let span =
+            { Lo = lo
+              Hi = hi }
+        let! token = mkTok span kind
+        let! tokens = lexer
+        return token :: tokens
+    }
 
 (* lex `src` *)
 and withSrc src =
