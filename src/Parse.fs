@@ -1,10 +1,8 @@
 module Parse
 
-open Format
 open Result
 open Ast
 open Lex
-
 
 type ParseError = ParseError
 
