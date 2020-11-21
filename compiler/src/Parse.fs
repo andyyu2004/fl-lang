@@ -19,7 +19,6 @@ let runParser (P f) tokens = f tokens
 
 let (>>=) x f = bind f x
 
-
 let private error err = P(fun pcx -> (Error err, pcx))
 
 
