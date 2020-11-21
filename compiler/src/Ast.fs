@@ -6,6 +6,20 @@ open Format
 type NodeId =
     { Id: int }
 
+type PathSegment =
+    { Ident: Ident }
+
+    interface IShow with
+        member this.Show() = show this.Ident
+
+
+type Path =
+    { Span: Span
+      Segments: list<PathSegment> }
+    interface IShow with
+        member this.Show() = showList this.Segments "::"
+
+
 type LitKind =
     | LitInt of int
     | LitBool of bool
@@ -70,6 +84,7 @@ type Expr =
 and ExprKind =
     | ExprLit of Lit
     | ExprGroup of Expr
+    | ExprPath of Path
     | ExprUnary of UnOp * Expr
     | ExprBin of BinOp * Expr * Expr
     | ExprTuple of list<Expr>
@@ -78,6 +93,7 @@ and ExprKind =
         member this.Show() =
             match this with
             | ExprLit lit -> sprintf "%s" (show lit)
+            | ExprPath path -> sprintf "%s" (show path)
             | ExprGroup expr -> sprintf "(%s)" (show expr)
             | ExprUnary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
             | ExprBin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
@@ -91,20 +107,6 @@ type Pat =
 and PatKind =
     | PatBind of Ident
     | PatGroup of Pat
-
-type PathSegment =
-    { Ident: Ident }
-
-    interface IShow with
-        member this.Show() = show this.Ident
-
-
-type Path =
-    { Span: Span
-      Segments: list<PathSegment> }
-    interface IShow with
-        member this.Show() = showList this.Segments "::"
-
 
 (* ast representation of types; not to be confused with `Ty` *)
 // todo
@@ -142,7 +144,7 @@ type FnDef =
       Params: list<unit>
       Body: Expr }
     interface IShow with
-        member this.Show() = sprintf "%s %s = %s" (show this.Ident) "<params>" (show this.Body)
+        member this.Show() = sprintf "%s = %s" (show this.Ident) (show this.Body)
 
 type FnItem =
     { Ident: Ident

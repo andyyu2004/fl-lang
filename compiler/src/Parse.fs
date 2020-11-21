@@ -1,10 +1,15 @@
 module Parse
 
 open Result
+open Format
 open Ast
 open Lex
 
-type ParseError = ParseError
+type ParseError =
+    | ParseError
+
+    interface IShow with
+        member _this.Show() = "parse error"
 
 
 type ParseCtxt =
@@ -199,7 +204,7 @@ let rec private parseToken tk =
         let! _ = expect tk
         return () }
 
-let private parseTuple p = parse { return! sepBy1 p <| parseToken TkComma }
+let private parseTuple p = parse { return! sepBy p <| parseToken TkComma }
 
 let private expectIdent =
     parse {
@@ -236,17 +241,19 @@ let private parsePathSegment: Parse<PathSegment> =
         let! ident = expectIdent
         return { Ident = ident } }
 
-let private parsePathTy =
+let private parsePath =
     parse {
         let! segment = parsePathSegment
         let span = segment.Ident.Span
+        return { Span = span
+                 Segments = [ segment ] }
+    }
 
-        let path =
-            { Segments = [ segment ]
-              Span = span }
-
+let private parseTyPath =
+    parse {
+        let! path = parsePath
         let kind = AstTyPath path
-        return! mkTy span kind
+        return! mkTy (path.Span) kind
     }
 
 #nowarn "40"
@@ -255,7 +262,7 @@ let private parsePathTy =
 let rec private parseTy: Parse<Type> =
     parse {
         // use the <|> combinator to parse all the potential different types
-        let! ty = parsePathTy <|> parseTupleTy
+        let! ty = parseTyPath <|> parseTupleTy
         match! accept TkRArrow with
         | None -> return ty
         | Some _ ->
@@ -313,6 +320,13 @@ let private parseAssoc ops p =
 
 
 
+let private parseExprPath =
+    parse {
+        let! path = parsePath
+        let kind = ExprPath path
+        return! mkExpr (path.Span) kind
+    }
+
 let rec private parseExpr: Parse<Expr> = parseTerm
 
 and parseTerm = parseAssoc [ TkPlus; TkMinus ] parseFactor
@@ -333,7 +347,7 @@ and parseUnary =
     }
 
 // note we must parse group before tuple as `( <expr> )` should be parsed as a group not a tuple
-and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr <|> parseTupleExpr
+and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr <|> parseTupleExpr <|> parseExprPath
 
 and parseTupleExpr =
     parse {

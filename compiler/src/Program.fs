@@ -17,7 +17,7 @@ let runCompiler path =
     let ast = runParsePhase path
     match ast with
     | Ok ast -> printfn "%s" (show ast)
-    | Error _err -> printfn "parse error"
+    | Error err -> printfn "%s" (show err)
 
 [<EntryPoint>]
 let main argv =

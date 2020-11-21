@@ -147,6 +147,7 @@ let rec lexer =
         | ',' :: xs -> return! addTok TkComma xs
         | (' '
         | '\t'
+        | '\r'
         | '\n') :: xs -> return! withSrc xs
         | '_' :: _ -> return! lexIdent
         | x :: _ when Char.IsLetter x -> return! lexIdent
