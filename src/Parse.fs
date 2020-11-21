@@ -231,45 +231,31 @@ let private parseLiteralInt: Parse<Lit> =
                  Kind = LitInt i }
     }
 
+let rec private parseAssoc' ops (p: Parse<Expr>) (l: Expr): Parse<Expr> =
+    parse {
+        let! token = acceptOneOf ops
+        if Option.isSome token then
+            let binop = token.Value.Kind |> BinOp.FromToken
+            let! r = p
+            let span = l.Span ++ r.Span
+            let kind = ExprBin(binop, l, r)
+            let! expr = mkExpr span kind
+            return! parseAssoc' ops p expr
+        else
+            return l
+    }
+
+let private parseAssoc ops p: Parse<Expr> =
+    parse {
+        let! left = p
+        return! parseAssoc' ops p left }
+
+
 let rec private parseExpr: Parse<Expr> = parseTerm
 
-and parseTerm =
-    parse {
-        let! left = parseFactor
-        return! parseTerm' left }
+and parseTerm = parseAssoc [ TkPlus; TkMinus ] parseFactor
 
-and parseTerm' l =
-    parse {
-        let! token = acceptOneOf [ TkPlus; TkMinus ]
-        if Option.isSome token then
-            let binop = token.Value.Kind |> BinOp.FromToken
-            let! r = parseFactor
-            let span = l.Span ++ r.Span
-            let kind = ExprBin(binop, l, r)
-            let! expr = mkExpr span kind
-            return! parseTerm' expr
-        else
-            return l
-    }
-
-and parseFactor: Parse<Expr> =
-    parse {
-        let! left = parsePrimary
-        return! parseFactor' left }
-
-and parseFactor' l =
-    parse {
-        let! token = acceptOneOf [ TkStar; TkSlash ]
-        if Option.isSome token then
-            let binop = token.Value.Kind |> BinOp.FromToken
-            let! r = parsePrimary
-            let span = l.Span ++ r.Span
-            let kind = ExprBin(binop, l, r)
-            let! expr = mkExpr span kind
-            return! parseFactor' expr
-        else
-            return l
-    }
+and parseFactor = parseAssoc [ TkStar; TkSlash ] parsePrimary
 
 and parseGroupExpr =
     parse {
