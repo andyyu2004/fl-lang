@@ -3,6 +3,8 @@ module State
 type State<'s, 'a> = S of ('s -> ('a * 's))
 
 let runState (S f) s = f s
+let execState f s = runState f s |> fst
+let evalState f s = runState f s |> snd
 
 
 type StateBuilder() =

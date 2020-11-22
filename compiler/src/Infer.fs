@@ -1,37 +1,25 @@
 module Infer
 
 open Type
+open State
 open TypeContext
+open Unify
 
 type Tyvid = int
 
 type InferCtxt =
-    { Tyvars: Map<Tyvid, Ty>
-      Tcx: TyCtxt }
-    static member New tcx = { Tyvars = Map []; Tcx = tcx }
+    { Tcx: TyCtxt
+      Tyvars: UnificationTable<Ty> }
+
+    static member New tcx =
+        { Tyvars = UnificationTable()
+          Tcx = tcx }
 
 
 let withInferCtxt tcx f = InferCtxt.New tcx |> f
 
-type Infcx<'a> = Infcx of (InferCtxt -> (InferCtxt * 'a))
+type Infcx<'a> = State<'a, InferCtxt>
 
-let runInfcx (Infcx f) x = f x
+let infcx = state
 
-type InfcxBuilder() =
-    member _x.Return x = Infcx(fun tcx -> (tcx, x))
-    member _x.ReturnFrom(x) = x
-    // f :: 'a -> Tcx<'a>
-    // x :: 'a
-    // (>>=) :: Tcx<'a> -> (a -> Tcx<'a>) -> Tcx<'a>
-    member _x.Bind(x, f) =
-        Infcx(fun infcx ->
-            let (infcx', t) = runInfcx x infcx
-            runInfcx (f t) infcx')
-
-    member _x.Zero() = failwith ""
-    member _x.Combine(p, q) = failwith ""
-
-    member _x.Delay(f) =
-        Infcx(fun src -> let (Infcx g) = f () in g src)
-
-let infcx = InfcxBuilder()
+let unify s t = infcx { failwith "" }

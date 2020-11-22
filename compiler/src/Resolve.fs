@@ -10,7 +10,6 @@ open State
 
 let resolve = state
 
-
 [<RequireQualifiedAccess>]
 type Res =
     | Local of NodeId
@@ -166,7 +165,6 @@ type LateResolver() =
 
 
 let runResolver = runState
-
 
 let resolveAst (ast: Ast): Resolve<Resolutions> =
     resolve {
