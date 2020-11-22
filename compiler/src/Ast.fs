@@ -79,7 +79,6 @@ type BinOp =
 [<RequireQualifiedAccess>]
 type ExprKind =
     | Lit of Lit
-    | Group of Expr
     | Path of Path
     | Unary of UnOp * Expr
     | Bin of BinOp * Expr * Expr
@@ -92,7 +91,6 @@ type ExprKind =
             match this with
             | Lit lit -> sprintf "%s" (show lit)
             | Path path -> sprintf "%s" (show path)
-            | Group expr -> sprintf "(%s)" (show expr)
             | Unary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
             | Bin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
             | Tuple(xs) -> sprintf "(%s)" (showList xs ",")
@@ -110,14 +108,12 @@ and Expr =
 [<RequireQualifiedAccess>]
 type PatKind =
     | Bind of Ident
-    | Group of Pat
     | Tuple of list<Pat>
 
     interface IShow with
         member this.Show() =
             match this with
             | Bind name -> show name
-            | Group pat -> sprintf "(%s)" (show pat)
             | Tuple pats -> sprintf "(%s)" (showList pats ",")
 
 and Pat =

@@ -8,5 +8,5 @@ let fuck = x
 // tuple :: (Int, Bool)
 // tuple = (5, 6)
 
-// sig apply :: Int
-// let apply f x  = f x
+sig compose :: Int
+let weirdcompose f g x  = f g x

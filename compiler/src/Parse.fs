@@ -266,7 +266,7 @@ let private parseTyPath =
 let rec private parseTy: Parse<AstTy> =
     parse {
         // use the <|> combinator to parse all the potential different types
-        let! ty = parseTyPath <|> parseTupleTy
+        let! ty = parseTyPath <|> parseGroupTy <|> parseTupleTy
         match! accept TkRArrow with
         | None -> return ty
         | Some _ ->
@@ -284,6 +284,15 @@ and parseTupleTy =
         let span = l.Span ++ r.Span
         let kind = AstTyKind.Tuple tys
         return! mkTy span kind
+    }
+
+and parseGroupTy =
+    parse {
+        let! l = expect TkLParen
+        let! ty = parseTy
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        return { ty with Span = span }
     }
 
 let rec mkExpr span kind: Parse<Expr> =
@@ -384,8 +393,7 @@ and parseGroupExpr =
         let! expr = parseExpr
         let! r = expect TkRParen
         let span = l.Span ++ r.Span
-        let kind = ExprKind.Group expr
-        return! mkExpr span kind
+        return { expr with Span = span }
     }
 
 and parseLiteralExpr =
@@ -421,8 +429,7 @@ and parsePatGroup =
         let! pat = parsePat
         let! r = expect TkRParen
         let span = l.Span ++ r.Span
-        let kind = PatKind.Group pat
-        return! mkPat span kind
+        return { pat with Span = span }
     }
 
 and parsePatTuple =

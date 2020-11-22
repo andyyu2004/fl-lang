@@ -53,7 +53,6 @@ type AstVisitor<'s>() =
         state {
             match pat.Kind with
             | PatKind.Bind ident -> do! this.VisitIdent ident
-            | PatKind.Group(pat) -> do! this.VisitPat pat
             | PatKind.Tuple(pats) -> do! mapM' this.VisitPat pats
         }
 
@@ -79,7 +78,6 @@ type AstVisitor<'s>() =
         state {
             match expr.Kind with
             | ExprKind.Path(path) -> do! this.VisitPath path
-            | ExprKind.Group expr -> do! this.VisitExpr expr
             | ExprKind.Lit(_lit) -> return ()
             | ExprKind.Unary(_, expr) -> do! this.VisitExpr expr
             | ExprKind.App(lhs, rhs)

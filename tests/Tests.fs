@@ -40,7 +40,7 @@ let parseArrowTyRightAssoc() =
 [<Fact>]
 let parsedTyGroup() =
     let src = "sig f :: (Int -> Bool) -> Int"
-    let expected = "sig f :: (((Int -> Bool)) -> Int)"
+    let expected = "sig f :: ((Int -> Bool) -> Int)"
     parse src expected
 
 
@@ -99,4 +99,16 @@ let parseMultiplePatBind() =
 let parsePatTuple() =
     let src = "let f (x, y) z = z"
     let expected = "let f (x,y) z = z"
+    parse src expected
+
+[<Fact>]
+let parseAppLeftAssoc() =
+    let src = "let weirdcompose f g x = f g x"
+    let expected = "let weirdcompose f g x = ((f g) x)"
+    parse src expected
+
+[<Fact>]
+let parseAppGrouped() =
+    let src = "let compose f g x = f (g x)"
+    let expected = "let compose f g x = (f (g x))"
     parse src expected
