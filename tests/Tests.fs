@@ -82,3 +82,22 @@ let parseUnary() =
     let src = "f :: () f = !-5"
     let expected = "f :: ()\nf = (!(-5))"
     parse src expected
+
+
+[<Fact>]
+let parsePatBind() =
+    let src = "f :: Int f x = x"
+    let expected = "f :: Int\nf x = x"
+    parse src expected
+
+[<Fact>]
+let parseMultiplePatBind() =
+    let src = "f :: Int f x y = x"
+    let expected = "f :: Int\nf x y = x"
+    parse src expected
+
+[<Fact>]
+let parsePatTuple() =
+    let src = "f :: Int f (x, y) z = z"
+    let expected = "f :: Int\nf (x,y) z = z"
+    parse src expected

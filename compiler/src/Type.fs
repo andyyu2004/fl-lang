@@ -1,6 +1,7 @@
 module Type
 
+[<RequireQualifiedAccess>]
 type Ty =
-    | TyInt
-    | TyBool
-    | TyFn of Ty * Ty
+    | Int
+    | Bool
+    | Fn of Ty * Ty

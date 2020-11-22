@@ -73,7 +73,27 @@ type BinOp =
             | BinOpMul -> "*"
             | BinOpDiv -> "/"
 
-type Expr =
+
+[<RequireQualifiedAccess>]
+type ExprKind =
+    | Lit of Lit
+    | Group of Expr
+    | Path of Path
+    | Unary of UnOp * Expr
+    | Bin of BinOp * Expr * Expr
+    | Tuple of list<Expr>
+
+    interface IShow with
+        member this.Show() =
+            match this with
+            | Lit lit -> sprintf "%s" (show lit)
+            | Path path -> sprintf "%s" (show path)
+            | Group expr -> sprintf "(%s)" (show expr)
+            | Unary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
+            | Bin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
+            | Tuple(xs) -> sprintf "(%s)" (showList xs ",")
+
+and Expr =
     { Id: NodeId
       Span: Span
       Kind: ExprKind }
@@ -81,70 +101,70 @@ type Expr =
     interface IShow with
         member this.Show() = show this.Kind
 
-and ExprKind =
-    | ExprLit of Lit
-    | ExprGroup of Expr
-    | ExprPath of Path
-    | ExprUnary of UnOp * Expr
-    | ExprBin of BinOp * Expr * Expr
-    | ExprTuple of list<Expr>
+
+[<RequireQualifiedAccess>]
+type PatKind =
+    | Bind of Ident
+    | Group of Pat
+    | Tuple of list<Pat>
 
     interface IShow with
         member this.Show() =
             match this with
-            | ExprLit lit -> sprintf "%s" (show lit)
-            | ExprPath path -> sprintf "%s" (show path)
-            | ExprGroup expr -> sprintf "(%s)" (show expr)
-            | ExprUnary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
-            | ExprBin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
-            | ExprTuple(xs) -> sprintf "(%s)" (showList xs ",")
+            | Bind name -> show name
+            | Group pat -> sprintf "(%s)" (show pat)
+            | Tuple pats -> sprintf "(%s)" (showList pats ",")
 
-type Pat =
+and Pat =
     { Id: NodeId
       Span: Span
       Kind: PatKind }
 
-and PatKind =
-    | PatBind of Ident
-    | PatGroup of Pat
-
-(* ast representation of types; not to be confused with `Ty` *)
-// todo
-type Type =
-    { Id: NodeId
-      Span: Span
-      Kind: TypeKind }
-
     interface IShow with
         member this.Show() = show this.Kind
 
-and TypeKind =
-    | AstTyInt
-    | AstTyBool
-    | AstTyTuple of list<Type>
-    | AstTyPath of Path
-    | AstTyFn of Type * Type
+(* ast representation of types; not to be confused with `Ty` *)
+// todo
+
+[<RequireQualifiedAccess>]
+type AstTyKind =
+    | Int
+    | Bool
+    | Tuple of list<AstTy>
+    | Path of Path
+    | Fn of AstTy * AstTy
 
     interface IShow with
         member this.Show() =
             match this with
-            | AstTyInt -> "int"
-            | AstTyBool -> "bool"
-            | AstTyTuple tys -> sprintf "(%s)" (showList tys ",")
-            | AstTyPath path -> (path :> IShow).Show()
-            | AstTyFn(t, u) -> sprintf "(%s -> %s)" (show t) (show u)
+            | Int -> "int"
+            | Bool -> "bool"
+            | Tuple tys -> sprintf "(%s)" (showList tys ",")
+            | Path path -> (path :> IShow).Show()
+            | Fn(t, u) -> sprintf "(%s -> %s)" (show t) (show u)
 
+and AstTy =
+    { Id: NodeId
+      Span: Span
+      Kind: AstTyKind }
+
+    interface IShow with
+        member this.Show() = show this.Kind
 
 (* type signature *)
-type Sig = Type
+type Sig = AstTy
 
 type FnDef =
     { Ident: Ident
       Span: Span
-      Params: list<unit>
+      Params: list<Pat>
       Body: Expr }
     interface IShow with
-        member this.Show() = sprintf "%s = %s" (show this.Ident) (show this.Body)
+        member this.Show() =
+            // need two cases to get the spacing nice
+            if this.Params.IsEmpty
+            then sprintf "%s = %s" (show this.Ident) (show this.Body)
+            else sprintf "%s %s = %s" (show this.Ident) (showList this.Params " ") (show this.Body)
 
 type FnItem =
     { Ident: Ident
@@ -156,13 +176,14 @@ type FnItem =
             sprintf "%s :: %s\n%s" (show this.Ident) (show this.Sig) (show this.Def)
 
 
+[<RequireQualifiedAccess>]
 type ItemKind =
-    | ItemFn of FnItem
+    | Fn of FnItem
 
     interface IShow with
         member this.Show() =
             match this with
-            | ItemFn fn -> show fn
+            | Fn fn -> show fn
 
 
 type Item =

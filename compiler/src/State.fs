@@ -23,3 +23,14 @@ let state = StateBuilder()
 
 let get = S(fun s -> (s, s))
 let put s = S(fun _ -> ((), s))
+
+let rec mapM f =
+    function
+    | [] -> state { return [] }
+    | p :: ps ->
+        state {
+            let! x = f p
+            let! xs = mapM f ps
+            return x :: xs }
+
+let rec sequence xs = mapM id xs

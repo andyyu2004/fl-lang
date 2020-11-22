@@ -3,6 +3,7 @@ module TypeContext
 open Ast
 open Type
 
+[<NoEquality; NoComparison>]
 type TyCtxt =
     { NodeTypes: Map<NodeId, Ty> }
     static member Default = { NodeTypes = Map [] }

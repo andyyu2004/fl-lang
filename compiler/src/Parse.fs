@@ -228,7 +228,7 @@ let private expectInt =
         | None -> return! error ParseError
     }
 
-let private mkTy span kind: Parse<Type> =
+let private mkTy span kind: Parse<AstTy> =
     parse {
         let! idx = nextId
         return { Id = idx
@@ -252,14 +252,14 @@ let private parsePath =
 let private parseTyPath =
     parse {
         let! path = parsePath
-        let kind = AstTyPath path
+        let kind = AstTyKind.Path path
         return! mkTy (path.Span) kind
     }
 
 #nowarn "40"
 
 
-let rec private parseTy: Parse<Type> =
+let rec private parseTy: Parse<AstTy> =
     parse {
         // use the <|> combinator to parse all the potential different types
         let! ty = parseTyPath <|> parseTupleTy
@@ -268,7 +268,7 @@ let rec private parseTy: Parse<Type> =
         | Some _ ->
             let! rty = parseTy
             let span = ty.Span ++ rty.Span
-            let kind = AstTyFn(ty, rty)
+            let kind = AstTyKind.Fn(ty, rty)
             return! mkTy span kind
     }
 
@@ -278,7 +278,7 @@ and parseTupleTy =
         let! tys = parseTuple parseTy
         let! r = expect TkRParen
         let span = l.Span ++ r.Span
-        let kind = AstTyTuple tys
+        let kind = AstTyKind.Tuple tys
         return! mkTy span kind
     }
 
@@ -306,7 +306,7 @@ let rec private parseAssoc' ops (p: Parse<Expr>) (l: Expr): Parse<Expr> =
             let binop = token.Value.Kind |> BinOp.FromToken
             let! r = p
             let span = l.Span ++ r.Span
-            let kind = ExprBin(binop, l, r)
+            let kind = ExprKind.Bin(binop, l, r)
             let! expr = mkExpr span kind
             return! parseAssoc' ops p expr
         else
@@ -323,7 +323,7 @@ let private parseAssoc ops p =
 let private parseExprPath =
     parse {
         let! path = parsePath
-        let kind = ExprPath path
+        let kind = ExprKind.Path path
         return! mkExpr (path.Span) kind
     }
 
@@ -341,7 +341,7 @@ and parseUnary =
             let unop = UnOp.FromToken token.Kind
             let! expr = parseUnary
             let span = token.Span ++ expr.Span
-            let kind = ExprUnary(unop, expr)
+            let kind = ExprKind.Unary(unop, expr)
             return! mkExpr span kind
         | None -> return! parsePrimary
     }
@@ -355,7 +355,7 @@ and parseTupleExpr =
         let! exprs = parseTuple parseExpr
         let! r = expect TkRParen
         let span = l.Span ++ r.Span
-        let kind = ExprTuple exprs
+        let kind = ExprKind.Tuple exprs
         return! mkExpr span kind
     }
 
@@ -365,7 +365,7 @@ and parseGroupExpr =
         let! expr = parseExpr
         let! r = expect TkRParen
         let span = l.Span ++ r.Span
-        let kind = ExprGroup expr
+        let kind = ExprKind.Group expr
         return! mkExpr span kind
     }
 
@@ -373,25 +373,62 @@ and parseLiteralExpr =
     parse {
         (* let! lit = (parseLiteralInt <|> parseLiteralBool) *)
         let! lit = parseLiteralInt
-        let kind = ExprLit lit
+        let kind = ExprKind.Lit lit
 
         return! mkExpr lit.Span kind
     }
 
 let private parseSig = parseTy
 
+let private mkPat span kind: Parse<Pat> =
+    parse {
+        let! idx = nextId
+        return { Id = idx
+                 Span = span
+                 Kind = kind }
+    }
+
+let rec private parsePat: Parse<Pat> = parsePatBind <|> parsePatGroup <|> parsePatTuple
+
+and parsePatBind =
+    parse {
+        let! name = expectIdent
+        let kind = PatKind.Bind name
+        return! mkPat name.Span kind
+    }
+
+and parsePatGroup =
+    parse {
+        let! l = expect TkLParen
+        let! pat = parsePat
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        let kind = PatKind.Group pat
+        return! mkPat span kind
+    }
+
+and parsePatTuple =
+    parse {
+        let! l = expect TkLParen
+        let! pats = parseTuple parsePat
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        let kind = PatKind.Tuple pats
+        return! mkPat span kind
+    }
+
 (* let private parseFnItem = parse {  } *)
 
 let private parseFnDef =
     parse {
         let! ident = expectIdent
-        // params
+        let! pats = many parsePat
         do! parseToken TkEq
         let! body = parseExpr
         let span = ident.Span ++ body.Span
         return { Ident = ident
                  Span = span
-                 Params = []
+                 Params = pats
                  Body = body }
     }
 
@@ -432,7 +469,7 @@ let private mkItem span kind: Parse<Item> =
 let private parseItem: Parse<Item> =
     parse {
         let! fnItem = parseFnItem
-        return! mkItem fnItem.Span (ItemFn fnItem) }
+        return! mkItem fnItem.Span (ItemKind.Fn fnItem) }
 
 (* top level ast parse function *)
 let private parseProgramInner: Parse<Ast> =

@@ -7,4 +7,5 @@ test = 5 + 3 * 9 + 8 - 88 / 888
 //tuple :: (Int, Bool)
 //tuple = (5, 6)
 
-f :: Int f = -!x
+f :: Int
+f (x,y) = x

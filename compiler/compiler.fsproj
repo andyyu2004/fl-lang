@@ -11,6 +11,7 @@
     <Compile Include="src/State.fs" />
     <Compile Include="src/Lex.fs" />
     <Compile Include="src/Ast.fs" />
+    <Compile Include="src/AstVisit.fs" />
     <Compile Include="src/Parse.fs" />
     <Compile Include="src/Resolve.fs" />
     <Compile Include="src/Type.fs" />
