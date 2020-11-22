@@ -75,15 +75,21 @@ let (<*>) f x =
 // on error
 // this allows this combinator to be used as a backtrack over multiple options
 let (<|>) (P p) (P q) =
-    P(fun pctx ->
-            match p pctx with
-            | (Ok a, pctx') -> (Ok a, pctx')
-            | (Error _, _pctx') -> q pctx)
+    P(fun pcx ->
+            match p pcx with
+            | (Ok a, pcx') -> (Ok a, pcx')
+            | (Error _, _pctx') -> q pcx)
 
 let (>*>) p q =
     parse {
         let! _ = p
         return! q }
+
+let catch (P p) t =
+    P(fun pcx ->
+            match p pcx with
+            | (Error _, _pcx) -> (Ok t, pcx)
+            | (Ok a, pcx') -> (Ok a, pcx'))
 
 
 let rec private many1 p: Parse<list<'a>> =
@@ -131,16 +137,6 @@ let private map f p =
 let get = P(fun pcx -> (Ok pcx, pcx))
 let put pcx = P(fun _ -> (Ok(), pcx))
 
-
-let private tokens =
-    parse {
-        let! pcx = get
-        return pcx.Tokens }
-
-let private currSpan =
-    parse {
-        let! t = tokens
-        return t.[0].Span }
 
 let private next: Parse<Token> =
     parse {
@@ -214,11 +210,11 @@ let private expectIdent =
         | None -> return! error ParseError
     }
 
-let private acceptInt: Parse<Option<int>> =
+let private acceptInt: Parse<Option<Span * int>> =
     parse {
         let! token = next
         match token.Kind with
-        | TkInt i -> return Some i
+        | TkInt i -> return Some(token.Span, i)
         | _ -> return None
     }
 
@@ -298,11 +294,9 @@ let rec mkExpr span kind: Parse<Expr> =
                  Kind = kind }
     }
 
-(* let private parseLiteralBool = failwith "" *)
 let private parseLiteralInt: Parse<Lit> =
     parse {
-        let! span = currSpan
-        let! i = expectInt
+        let! (span, i) = expectInt
         return { Span = span
                  Kind = LitInt i }
     }
@@ -345,17 +339,34 @@ and parseUnary =
     parse {
         let! token = acceptOneOf [ TkMinus; TkBang ]
         match token with
+        | None -> return! parseApp
         | Some token ->
             let unop = UnOp.FromToken token.Kind
             let! expr = parseUnary
             let span = token.Span ++ expr.Span
             let kind = ExprKind.Unary(unop, expr)
             return! mkExpr span kind
-        | None -> return! parsePrimary
     }
 
+and parseApp =
+    parse {
+        let! expr = parsePrimary
+        return! parseApp' expr }
+
+// tries to parse as many expressions until an error
+and parseApp' left =
+    let expr =
+        parse {
+            let! right = parsePrimary
+            let span = left.Span ++ right.Span
+            let kind = ExprKind.App(left, right)
+            let! expr = mkExpr span kind
+            return! parseApp' expr
+        }
+    catch expr left
+
 // note we must parse group before tuple as `( <expr> )` should be parsed as a group not a tuple
-and parsePrimary: Parse<Expr> = parseLiteralExpr <|> parseGroupExpr <|> parseTupleExpr <|> parseExprPath
+and parsePrimary: Parse<Expr> = parseGroupExpr <|> parseTupleExpr <|> parseExprPath <|> parseLiteralExpr
 
 and parseTupleExpr =
     parse {
@@ -386,7 +397,6 @@ and parseLiteralExpr =
         return! mkExpr lit.Span kind
     }
 
-let private parseSig = parseTy
 
 let private mkPat span kind: Parse<Pat> =
     parse {
@@ -429,29 +439,35 @@ and parsePatTuple =
 
 let private parseFnDef =
     parse {
+        let! let_kw = expect TkLet
         let! ident = expectIdent
         let! pats = many parsePat
         do! parseToken TkEq
         let! body = parseExpr
-        let span = ident.Span ++ body.Span
-        return { Ident = ident
-                 Span = span
-                 Params = pats
-                 Body = body }
+        let span = let_kw.Span ++ body.Span
+
+        let def =
+            { Ident = ident
+              Params = pats
+              Body = body }
+
+        return (span, ItemKind.FnDef def)
     }
 
-let private parseFnItem =
+let private parseFnSig =
     parse {
+        let! sig_kw = expect TkSig
         let! ident = expectIdent
         do! parseToken TkDColon
-        let! signature = parseSig
-        let! def = parseFnDef
-        let span = ident.Span ++ def.Span
-        return { Ident = ident
-                 Span = span
-                 Sig = signature
-                 Def = def }
+        let! ty = parseTy
+        let span = sig_kw.Span ++ ty.Span
+
+        let fnsig =
+            { Ident = ident
+              Type = ty }
+        return (span, ItemKind.Sig fnsig)
     }
+
 
 let private mkItem span kind: Parse<Item> =
     parse {
@@ -476,8 +492,8 @@ let private mkItem span kind: Parse<Item> =
 
 let private parseItem: Parse<Item> =
     parse {
-        let! fnItem = parseFnItem
-        return! mkItem fnItem.Span (ItemKind.Fn fnItem) }
+        let! (span, kind) = parseFnDef <|> parseFnSig
+        return! mkItem span kind }
 
 (* top level ast parse function *)
 let private parseProgramInner: Parse<Ast> =

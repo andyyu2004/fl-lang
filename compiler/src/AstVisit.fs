@@ -21,14 +21,17 @@ type AstVisitor<'s>() =
     member this.WalkItem item =
         state {
             match item.Kind with
-            | ItemKind.Fn fn ->
-                do! this.VisitIdent fn.Ident
-                do! this.VisitFnSig fn.Sig
-                do! this.VisitFnDef fn.Def
+            | ItemKind.FnDef def -> do! this.VisitFnDef def
+            | ItemKind.Sig fnsig -> do! this.VisitFnSig fnsig
         }
 
-    abstract VisitFnSig: Sig -> State<'s, unit>
-    default this.VisitFnSig fnsig = this.VisitTy fnsig
+    abstract VisitFnSig: FnSig -> State<'s, unit>
+
+    default this.VisitFnSig fnsig =
+        state {
+            do! this.VisitIdent fnsig.Ident
+            do! this.VisitTy fnsig.Type
+        }
 
     abstract VisitFnDef: FnDef -> State<'s, unit>
 
@@ -75,10 +78,11 @@ type AstVisitor<'s>() =
     member this.WalkExpr expr =
         state {
             match expr.Kind with
+            | ExprKind.Path(path) -> do! this.VisitPath path
             | ExprKind.Group expr -> do! this.VisitExpr expr
             | ExprKind.Lit(_lit) -> return ()
-            | ExprKind.Path(path) -> do! this.VisitPath path
             | ExprKind.Unary(_, expr) -> do! this.VisitExpr expr
+            | ExprKind.App(lhs, rhs)
             | ExprKind.Bin(_, lhs, rhs) ->
                 do! this.VisitExpr lhs
                 do! this.VisitExpr rhs

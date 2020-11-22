@@ -1,5 +1,6 @@
 module Tests
 
+open System
 open System.IO
 open Format
 open Compiler
@@ -11,7 +12,7 @@ let writeSourceToPath src =
     File.WriteAllText(path, src)
     path
 
-let parse src expected =
+let parse (src: string) (expected: string) =
     let ast = writeSourceToPath src |> runParsePhase
 
     let ast =
@@ -19,85 +20,83 @@ let parse src expected =
         | Ok ast -> ast
         | Error err -> failwith <| sprintf "%s" (show err)
 
-    eprintfn "%s" (show ast)
-
-    Assert.Equal(show ast, expected)
+    Assert.Equal((show ast).Trim(), expected.Trim())
 
 
 [<Fact>]
 let parseFnSig() =
-    let src = "f :: Int f = 5"
-    let expected = "f :: Int\nf = 5"
+    let src = "sig f :: Int"
+    let expected = "sig f :: Int"
 
     parse src expected
 
 [<Fact>]
 let parseArrowTyRightAssoc() =
-    let src = "f :: Int -> Bool -> Int f = 5"
-    let expected = "f :: (Int -> (Bool -> Int))\nf = 5"
+    let src = "sig f :: Int -> Bool -> Int"
+    let expected = "sig f :: (Int -> (Bool -> Int))"
 
     parse src expected
 
 [<Fact>]
 let parsedTyGroup() =
-    let src = "f :: (Int -> Bool) -> Int f = 5"
-    let expected = "f :: (((Int -> Bool)) -> Int)\nf = 5"
+    let src = "sig f :: (Int -> Bool) -> Int"
+    let expected = "sig f :: (((Int -> Bool)) -> Int)"
     parse src expected
 
 
 [<Fact>]
 let parseExprUnit() =
-    let src = "f :: () f = ()"
-    let expected = "f :: ()\nf = ()"
+    let src = "let f = ()"
+    let expected = "let f = ()"
     parse src expected
 
 [<Fact>]
 let parseExprTuple() =
-    let src = "f :: () f = (1,2,3)"
-    let expected = "f :: ()\nf = (1,2,3)"
+    let src = "let f = (1, 2, 3)"
+    let expected = "let f = (1,2,3)"
     parse src expected
 
 [<Fact>]
 let parseUnaryTuple() =
     // we know this will definitely not parse as a group due to the trailing comma
     // this is more a test that it succesfully parses as a tuple
-    let src = "f :: () f = (1,)"
-    let expected = "f :: ()\nf = (1)"
+    let src = "let f = (1,)"
+    let expected = "let f = (1)"
     parse src expected
 
 [<Fact>]
 let parseAssocLeftExpr() =
-    let src = "f :: () f = 2 + 3 + 4"
-    let expected = "f :: ()\nf = ((2 + 3) + 4)"
+    let src = "let f = 2 + 3 + 4"
+    let expected = "let f = ((2 + 3) + 4)"
     parse src expected
 
 [<Fact>]
 let parseAssocLeftExprWithPrecedence() =
-    let src = "f :: () f = 2 + 3 * 4"
-    let expected = "f :: ()\nf = (2 + (3 * 4))"
+    let src = "let f = 2 + 3 * 4"
+    let expected = "let f = (2 + (3 * 4))"
     parse src expected
 
 [<Fact>]
 let parseUnary() =
-    let src = "f :: () f = !-5"
-    let expected = "f :: ()\nf = (!(-5))"
+    let src = "let f = !-5"
+    let expected = "let f = (!(-5))"
     parse src expected
 
 
 [<Fact>]
 let parsePatBind() =
-    let src = "f :: Int f x = x"
-    let expected = "f :: Int\nf x = x"
+    let src = "let f x = x"
+    let expected = "let f x = x"
     parse src expected
 
 [<Fact>]
 let parseMultiplePatBind() =
-    let src = "f :: Int f x y = x"
-    let expected = "f :: Int\nf x y = x"
+    let src = "let f x y = x"
+    let expected = "let f x y = x"
     parse src expected
 
 [<Fact>]
 let parsePatTuple() =
-    let src = "f :: Int f (x, y) z = z"
-    let expected = "f :: Int\nf (x,y) z = z"
+    let src = "let f (x, y) z = z"
+    let expected = "let f (x,y) z = z"
     parse src expected

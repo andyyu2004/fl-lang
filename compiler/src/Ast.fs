@@ -84,6 +84,8 @@ type ExprKind =
     | Unary of UnOp * Expr
     | Bin of BinOp * Expr * Expr
     | Tuple of list<Expr>
+    | App of Expr * Expr
+
 
     interface IShow with
         member this.Show() =
@@ -94,6 +96,7 @@ type ExprKind =
             | Unary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
             | Bin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
             | Tuple(xs) -> sprintf "(%s)" (showList xs ",")
+            | App(f, x) -> sprintf "(%s %s)" (show f) (show x)
 
 and Expr =
     { Id: NodeId
@@ -154,38 +157,36 @@ and AstTy =
         member this.Show() = show this.Kind
 
 (* type signature *)
-type Sig = AstTy
+type FnSig =
+    { Ident: Ident
+      Type: AstTy }
+
+    interface IShow with
+        member this.Show() = sprintf "sig %s :: %s" (show this.Ident) (show this.Type)
 
 type FnDef =
     { Ident: Ident
-      Span: Span
       Params: list<Pat>
       Body: Expr }
     interface IShow with
         member this.Show() =
-            // need two cases to get the spacing nice
+            // need two cases to get the spacing correct
             if this.Params.IsEmpty
-            then sprintf "%s = %s" (show this.Ident) (show this.Body)
-            else sprintf "%s %s = %s" (show this.Ident) (showList this.Params " ") (show this.Body)
+            then sprintf "let %s = %s\n" (show this.Ident) (show this.Body)
+            else sprintf "let %s %s = %s\n" (show this.Ident) (showList this.Params " ") (show this.Body)
 
-type FnItem =
-    { Ident: Ident
-      Span: Span
-      Sig: Sig
-      Def: FnDef }
-    interface IShow with
-        member this.Show() =
-            sprintf "%s :: %s\n%s" (show this.Ident) (show this.Sig) (show this.Def)
 
 
 [<RequireQualifiedAccess>]
 type ItemKind =
-    | Fn of FnItem
+    | FnDef of FnDef
+    | Sig of FnSig
 
     interface IShow with
         member this.Show() =
             match this with
-            | Fn fn -> show fn
+            | FnDef def -> show def
+            | Sig fnsig -> show fnsig
 
 
 type Item =
@@ -201,4 +202,4 @@ type Ast =
     { Items: list<Item> }
 
     interface IShow with
-        member this.Show() = showList this.Items "\n\n"
+        member this.Show() = showList this.Items "\n"

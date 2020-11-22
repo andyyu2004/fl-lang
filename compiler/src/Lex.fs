@@ -2,7 +2,6 @@ module Lex
 
 open System
 open State
-open Format
 open Span
 
 
@@ -16,12 +15,20 @@ type TokenKind =
     | TkRFArrow
     | TkDColon
     | TkPlus
+    | TkEOF
+    | TkLet
+    | TkSig
     | TkMinus
     | TkStar
     | TkSlash
     | TkBang
     | TkComma
 
+
+let keywords =
+    Map
+        [ ("let", TkLet)
+          ("sig", TkSig) ]
 
 type Token =
     { Span: Span
@@ -144,10 +151,16 @@ let rec lexer =
 and lexIdent =
     lex {
         let! (span, ident) = withSpan lexIdentInner
-        let! token = mkTok span
-                         (TkIdent
-                             { Symbol = ident
-                               Span = span })
+
+        let kind =
+            match keywords.TryFind ident with
+            | Some kw -> kw
+            | None ->
+                (TkIdent
+                    { Symbol = ident
+                      Span = span })
+
+        let! token = mkTok span kind
         let! tokens = lexer
         return token :: tokens
     }

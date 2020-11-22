@@ -65,10 +65,12 @@ type ItemCollector() =
 
     override _this.VisitItem item =
         resolve {
+            // note we only consider the definition as the signature is optional
             match item.Kind with
-            | ItemKind.Fn fn ->
+            | ItemKind.FnDef def ->
                 let! rcx = get
-                do! put <| { rcx with Items = rcx.Items.Add(fn.Ident, item.Id) }
+                do! put <| { rcx with Items = rcx.Items.Add(def.Ident, item.Id) }
+            | ItemKind.Sig(_) -> return ()
         }
 
 type Resolve<'a> = State<ResolveCtxt, 'a>
@@ -161,8 +163,6 @@ type LateResolver() =
             | _ -> ()
             do! this.WalkPat pat
         }
-
-
 
 
 let runResolver = runState
