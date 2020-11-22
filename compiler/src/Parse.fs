@@ -1,6 +1,7 @@
 module Parse
 
 open Result
+open Span
 open Format
 open Ast
 open Lex
@@ -241,12 +242,19 @@ let private parsePathSegment: Parse<PathSegment> =
         let! ident = expectIdent
         return { Ident = ident } }
 
+let private mkPath span segments =
+    parse {
+        let! idx = nextId
+        return { Span = span
+                 Segments = segments
+                 Id = idx }
+    }
+
 let private parsePath =
     parse {
         let! segment = parsePathSegment
         let span = segment.Ident.Span
-        return { Span = span
-                 Segments = [ segment ] }
+        return! mkPath span [ segment ]
     }
 
 let private parseTyPath =

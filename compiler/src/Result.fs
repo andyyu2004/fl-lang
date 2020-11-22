@@ -7,3 +7,16 @@ type ResultBuilder() =
     member _.Zero() = None
 
 let result = ResultBuilder()
+
+type OptionalBuilder() =
+    member _.Return(x) = Some x
+    member _.ReturnFrom(x) = x
+
+    member _.Bind(opt, f) =
+        match opt with
+        | None -> None
+        | Some x -> f x
+
+    member _.Zero() = None
+
+let optional = OptionalBuilder()

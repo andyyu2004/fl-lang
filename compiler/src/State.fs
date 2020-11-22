@@ -14,7 +14,8 @@ type StateBuilder() =
                 let (t', s') = runState t s
                 runState (f t') s')
 
-    member _x.Zero() = failwith ""
+    member _x.Zero() = S(fun s -> ((), s))
+
     member x.Combine(p, q) = x.Bind(p, (fun _ -> q))
     member _x.Delay(f) =
         S(fun s -> let (S g) = f() in g s)
@@ -23,6 +24,15 @@ let state = StateBuilder()
 
 let get = S(fun s -> (s, s))
 let put s = S(fun _ -> ((), s))
+
+let rec mapM' f =
+    function
+    | [] -> state { return () }
+    | p :: ps ->
+        state {
+            do! f p
+            return! mapM' f ps
+        }
 
 let rec mapM f =
     function

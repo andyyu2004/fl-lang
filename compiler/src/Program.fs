@@ -18,14 +18,13 @@ let runResolutionPhase path =
     let ast = runParsePhase path
     match ast with
     | Error err -> failwith <| sprintf "%s" (show err)
-    | Ok ast ->
-        printfn "%s" (show ast)
-        (ast, resolveAst ast)
+    | Ok ast -> (ast, runResolveAst ast)
 
 
 let runCompiler path =
     let (ast, resolutions) = runResolutionPhase path
-    ()
+    printfn "%s" (show ast)
+    printfn "%A" resolutions
 
 [<EntryPoint>]
 let main argv =

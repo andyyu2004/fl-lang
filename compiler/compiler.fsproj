@@ -9,6 +9,8 @@
     <Compile Include="src/Format.fs" />
     <Compile Include="src/Result.fs" />
     <Compile Include="src/State.fs" />
+    <Compile Include="src/Span.fs" />
+    <Compile Include="src/Error.fs" />
     <Compile Include="src/Lex.fs" />
     <Compile Include="src/Ast.fs" />
     <Compile Include="src/AstVisit.fs" />

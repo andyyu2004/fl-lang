@@ -2,6 +2,7 @@ module Ast
 
 open Lex
 open Format
+open Span
 
 type NodeId =
     { Id: int }
@@ -15,6 +16,7 @@ type PathSegment =
 
 type Path =
     { Span: Span
+      Id: NodeId
       Segments: list<PathSegment> }
     interface IShow with
         member this.Show() = showList this.Segments "::"

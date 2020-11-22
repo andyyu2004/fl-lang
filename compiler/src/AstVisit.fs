@@ -1,81 +1,95 @@
 module AstVisit
 
-open Lex
+open Span
 open Ast
+open State
 
-type IAstVisitor =
-    abstract VisitAst: Ast -> unit
+[<AbstractClass>]
+type AstVisitor<'s>() =
 
-    default this.VisitAst ast =
-        for item in ast.Items do
-            this.VisitItem item
+    abstract VisitAst: Ast -> State<'s, unit>
 
-    abstract VisitItem: Item -> unit
+    default this.VisitAst ast = this.WalkAst ast
 
-    default this.VisitItem item =
-        match item.Kind with
-        | ItemKind.Fn fn ->
-            this.VisitIdent fn.Ident
-            this.VisitFnSig fn.Sig
-            this.VisitFnDef fn.Def
+    member this.WalkAst ast = mapM' this.VisitItem ast.Items
 
-    abstract VisitFnSig: Sig -> unit
+
+    abstract VisitItem: Item -> State<'s, unit>
+
+    default this.VisitItem item = this.WalkItem item
+
+    member this.WalkItem item =
+        state {
+            match item.Kind with
+            | ItemKind.Fn fn ->
+                do! this.VisitIdent fn.Ident
+                do! this.VisitFnSig fn.Sig
+                do! this.VisitFnDef fn.Def
+        }
+
+    abstract VisitFnSig: Sig -> State<'s, unit>
     default this.VisitFnSig fnsig = this.VisitTy fnsig
 
-    abstract VisitFnDef: FnDef -> unit
+    abstract VisitFnDef: FnDef -> State<'s, unit>
 
-    default this.VisitFnDef def =
-        this.VisitIdent def.Ident
-        for param in def.Params do
-            this.VisitPat param
-        this.VisitExpr def.Body
+    default this.VisitFnDef def = this.WalkFnDef def
 
-    abstract VisitPat: Pat -> unit
+    member this.WalkFnDef def =
+        state {
+            do! this.VisitIdent def.Ident
+            do! mapM' this.VisitPat def.Params
+            do! this.VisitExpr def.Body
+        }
 
-    default this.VisitPat pat =
-        match pat.Kind with
-        | PatKind.Bind ident -> this.VisitIdent ident
-        | PatKind.Group(pat) -> this.VisitPat pat
-        | PatKind.Tuple(pats) ->
-            for pat in pats do
-                this.VisitPat pat
+    abstract VisitPat: Pat -> State<'s, unit>
 
-    abstract VisitTy: AstTy -> unit
+
+    default this.VisitPat pat = this.WalkPat pat
+
+    member this.WalkPat pat =
+        state {
+            match pat.Kind with
+            | PatKind.Bind ident -> do! this.VisitIdent ident
+            | PatKind.Group(pat) -> do! this.VisitPat pat
+            | PatKind.Tuple(pats) -> do! mapM' this.VisitPat pats
+        }
+
+    abstract VisitTy: AstTy -> State<'s, unit>
 
     default this.VisitTy ty =
-        match ty.Kind with
-        | AstTyKind.Bool
-        | AstTyKind.Int -> ()
-        | AstTyKind.Tuple(tys) ->
-            for ty in tys do
-                this.VisitTy ty
-        | AstTyKind.Path(path) -> this.VisitPath path
-        | AstTyKind.Fn(param, ret) ->
-            this.VisitTy param
-            this.VisitTy ret
+        state {
+            match ty.Kind with
+            | AstTyKind.Bool
+            | AstTyKind.Int -> return ()
+            | AstTyKind.Tuple(tys) -> do! mapM' this.VisitTy tys
+            | AstTyKind.Path(path) -> do! this.VisitPath path
+            | AstTyKind.Fn(param, ret) ->
+                do! this.VisitTy param
+                do! this.VisitTy ret
+        }
 
-    abstract VisitExpr: Expr -> unit
+    abstract VisitExpr: Expr -> State<'s, unit>
 
-    default this.VisitExpr expr =
-        match expr.Kind with
-        | ExprKind.Group expr -> this.VisitExpr expr
-        | ExprKind.Lit(_lit) -> ()
-        | ExprKind.Path(path) -> this.VisitPath path
-        | ExprKind.Unary(_, expr) -> this.VisitExpr expr
-        | ExprKind.Bin(_, lhs, rhs) ->
-            this.VisitExpr lhs
-            this.VisitExpr rhs
-        | ExprKind.Tuple(exprs) ->
-            for expr in exprs do
-                this.VisitExpr expr
+    default this.VisitExpr expr = this.WalkExpr expr
 
-    abstract VisitIdent: Ident -> unit
-    default _this.VisitIdent _ident = ()
+    member this.WalkExpr expr =
+        state {
+            match expr.Kind with
+            | ExprKind.Group expr -> do! this.VisitExpr expr
+            | ExprKind.Lit(_lit) -> return ()
+            | ExprKind.Path(path) -> do! this.VisitPath path
+            | ExprKind.Unary(_, expr) -> do! this.VisitExpr expr
+            | ExprKind.Bin(_, lhs, rhs) ->
+                do! this.VisitExpr lhs
+                do! this.VisitExpr rhs
+            | ExprKind.Tuple(exprs) -> do! mapM' this.VisitExpr exprs
+        }
 
-    abstract VisitPathSegment: PathSegment -> unit
+    abstract VisitIdent: Ident -> State<'s, unit>
+    default _this.VisitIdent _ident = state { return () }
+
+    abstract VisitPathSegment: PathSegment -> State<'s, unit>
     default this.VisitPathSegment segment = this.VisitIdent segment.Ident
 
-    abstract VisitPath: Path -> unit
-    default this.VisitPath path =
-        for segment in path.Segments do
-            this.VisitPathSegment segment
+    abstract VisitPath: Path -> State<'s, unit>
+    default this.VisitPath path = mapM' this.VisitPathSegment path.Segments

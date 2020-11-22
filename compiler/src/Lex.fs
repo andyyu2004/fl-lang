@@ -3,22 +3,8 @@ module Lex
 open System
 open State
 open Format
+open Span
 
-type Span =
-    { Lo: int
-      Hi: int }
-
-let (++) s t =
-    { Lo = min s.Lo t.Lo
-      Hi = max s.Hi t.Hi }
-
-
-type Ident =
-    { Symbol: string
-      Span: Span }
-
-    interface IShow with
-        member this.Show() = this.Symbol
 
 type TokenKind =
     | TkIdent of Ident
@@ -152,7 +138,7 @@ let rec lexer =
         | '_' :: _ -> return! lexIdent
         | x :: _ when Char.IsLetter x -> return! lexIdent
         | n :: _ when Char.IsDigit n -> return! lexInt
-        | _ -> failwith ""
+        | _ -> return failwith ""
     }
 
 and lexIdent =
