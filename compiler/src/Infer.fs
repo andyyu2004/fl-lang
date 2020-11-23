@@ -27,23 +27,21 @@ let unifyTyVars x y: Tcx<Ty> =
     }
 
 
-type Equate() =
-    inherit IRelation()
-    override this.RelateTys s t =
-        tcx {
-            if s = t then
-                return s
-            else
-                match (s.Kind, t.Kind) with
-                | (TyKind.TyVar x, TyKind.TyVar y) -> return! unifyTyVars x y
-                | (TyKind.TyVar x, _) -> return! instantiate x t
-                | (_, TyKind.TyVar y) -> return! instantiate y s
-                | _ -> return! this.RelateTysInner s t
-        }
 
+let rec equateRelation s t =
+    tcx {
+        if s = t then
+            return s
+        else
+            match (s.Kind, t.Kind) with
+            | (TyKind.TyVar x, TyKind.TyVar y) -> return! unifyTyVars x y
+            | (TyKind.TyVar x, _) -> return! instantiate x t
+            | (_, TyKind.TyVar y) -> return! instantiate y s
+            | _ -> return! relateTys equateRelation s t
+    }
 
-
-let unify (span: ISpanned) = Equate().RelateTys
+// TODO check for errors? with catch?
+let unify (span: ISpanned) = equateRelation
 
 /// partially resolves a type variable
 let rec partiallyResolveTy ty =

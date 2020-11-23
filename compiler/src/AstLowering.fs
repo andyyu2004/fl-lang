@@ -15,9 +15,7 @@ let rec lowerPat (pat: Pat): Tcx<TPat> =
                     | PatKind.Tuple(pats) -> TPatKind.Tuple <+> mapM lowerPat pats
                     | PatKind.Bind ident -> tcx { return TPatKind.Bind ident }
         let! patTy = nodeTy pat.Id
-        printfn "ty: %O" patTy
         let! ty = fullyResolveTy patTy
-        printfn "fully resolved ty: %O" ty
         return { Id = pat.Id
                  Span = pat.Span
                  Ty = ty

@@ -26,12 +26,28 @@ type IRelation() =
             return s
         }
 
-type IRelate =
-    abstract Relate: IRelation -> IRelate -> IRelate -> Tcx<IRelate>
-
 
 type TypeFolder = Ty -> Tcx<Ty>
 
+type TypeRelation = Ty -> Ty -> Tcx<Ty>
+
+
+let rec relateTys (r: TypeRelation) (s: Ty) (t: Ty) =
+    assert (s <> t)
+    tcx {
+        match (s.Kind, t.Kind) with
+        | (TyKind.Tuple(xs), TyKind.Tuple(ys)) ->
+            let! ts = List.zip xs ys
+                      |> List.map (fun (x, y) -> relateTys r x y)
+                      |> sequence
+            return TyKind.Tuple(ts)
+        | (TyKind.Fn(fl, rl), TyKind.Fn(fr, rr)) ->
+            let! f = relateTys r fl fr
+            let! r = relateTys r rl rr
+            return TyKind.Fn(f, r)
+        | _ -> return TyKind.Err
+        return s
+    }
 
 let rec foldTy (f: TypeFolder) (ty: Ty): Tcx<Ty> =
     tcx {
