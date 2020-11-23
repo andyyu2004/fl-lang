@@ -73,9 +73,14 @@ let rec checkExpr (expr: Expr): Tcx<Ty> =
 and checkExprApp expr f arg: Tcx<Ty> =
     tcx {
         let! fty = checkExpr f
+        printfn "f :: %s" (show fty)
         let! arg = checkExpr arg
+        printfn "arg :: %s" (show arg)
         let! rty = newTyvar
-        return! unify expr fty <| Ty.Fn(arg, rty) }
+        printfn "ret :: %s" (show rty)
+        let! _ = unify expr fty <| Ty.Fn(arg, rty)
+        return rty
+    }
 
 /// converts uncurried type into curried type
 let rec curriedTy (paramTys: list<Ty>) (retTy: Ty): Ty =
