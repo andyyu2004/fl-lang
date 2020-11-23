@@ -41,7 +41,7 @@ let recordSig nodeId ty =
             do! put { tcx with ItemTypes = itemTypes }
     }
 
-let rec mkTyErr: Tcx<Ty> = tcx { return Ty.Err }
+let rec mkTyErr: Tcx<Ty> = tcx { return mkTy TyKind.Err }
 
 let getRes (path: Path): Tcx<Res> =
     tcx {
@@ -65,14 +65,17 @@ let recordTy nodeId ty: Tcx<_> =
 
 let probeTyvar var: Tcx<TyVarValue> =
     tcx {
+        printfn "%A" var
         let! tcx = get
-        return tcx.Tyvars.ProbeValue var }
+        printfn "%A" <| tcx.Tyvars.ProbeValue var
+        return tcx.Tyvars.ProbeValue var
+    }
 
 /// resolves a type variable
 let rec resolveTy ty =
     tcx {
-        match ty with
-        | Ty.TyVar var ->
+        match ty.Kind with
+        | TyKind.TyVar var ->
             match! probeTyvar var with
             | TyVarValue.Known ty' -> return! resolveTy ty'
             | TyVarValue.Unconstrained -> return ty

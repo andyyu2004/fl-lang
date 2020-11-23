@@ -12,7 +12,7 @@ type TyVar =
 
 
 [<RequireQualifiedAccess>]
-type Ty =
+type TyKind =
     | Int
     | Bool
     | Err
@@ -31,7 +31,15 @@ type Ty =
             | Fn(param, ret) -> sprintf "(%s -> %s)" (show param) (show ret)
             | TyVar(tyvar) -> (show tyvar)
 
+and Ty =
+    { Kind: TyKind }
+    interface IShow with
+        member this.Show() = show this.Kind
+
+
 and Substs = array<Ty>
+
+let mkTy kind = { Kind = kind }
 
 [<RequireQualifiedAccess>]
 type TypeError =

@@ -20,6 +20,7 @@
     <Compile Include="src/TypedAst.fs" />
     <Compile Include="src/Unify.fs" />
     <Compile Include="src/TypeContext.fs" />
+    <Compile Include="src/TypeTraversal.fs" />
     <Compile Include="src/Infer.fs" />
     <Compile Include="src/TypeLowering.fs" />
     <Compile Include="src/AstLowering.fs" />

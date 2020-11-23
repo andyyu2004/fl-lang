@@ -3,7 +3,6 @@ module Typecheck
 open Infer
 open Resolve
 open Format
-open AstLowering
 open RState
 open Type
 open Ast
@@ -40,14 +39,20 @@ type FnDefCollector() =
 let checkLit (lit: Lit): Tcx<Ty> =
     tcx {
         match lit.Kind with
-        | LitKind.LitBool _ -> return Ty.Bool
-        | LitKind.LitInt _ -> return Ty.Int
+        | LitKind.LitBool _ -> return mkTy TyKind.Bool
+        | LitKind.LitInt _ -> return mkTy TyKind.Int
     }
 
 let rec checkPat (pat: Pat): Tcx<Ty> =
     tcx {
-        let! tyvar = newTyvar
-        return! recordTy pat.Id tyvar }
+        match pat.Kind with
+        | PatKind.Tuple(pats) ->
+            let! tys = mapM checkPat pats
+            return mkTy (TyKind.Tuple tys)
+        | PatKind.Bind _ ->
+            let! tyvar = newTyvar
+            return! recordTy pat.Id tyvar
+    }
 
 
 let checkExprPath expr (path: Path): Tcx<Ty> =
@@ -73,20 +78,16 @@ let rec checkExpr (expr: Expr): Tcx<Ty> =
 and checkExprApp expr f arg: Tcx<Ty> =
     tcx {
         let! fty = checkExpr f
-        printfn "f :: %s" (show fty)
         let! arg = checkExpr arg
-        printfn "arg :: %s" (show arg)
         let! rty = newTyvar
-        printfn "ret :: %s" (show rty)
-        let! _ = unify expr fty <| Ty.Fn(arg, rty)
-        return rty
-    }
+        let! _ = unify expr fty <| mkTy (TyKind.Fn(arg, rty))
+        return rty }
 
 /// converts uncurried type into curried type
 let rec curriedTy (paramTys: list<Ty>) (retTy: Ty): Ty =
     match paramTys with
     | [] -> retTy
-    | t :: ts -> Ty.Fn(t, curriedTy ts retTy)
+    | t :: ts -> mkTy <| TyKind.Fn(t, curriedTy ts retTy)
 
 type Typechecker() =
     inherit AstVisitor<TyCtxt, TypeError>()

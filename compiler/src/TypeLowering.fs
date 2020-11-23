@@ -25,14 +25,14 @@ open TypeContext
 let rec astTyToTy (astTy: AstTy): Tcx<Ty> =
     tcx {
         match astTy.Kind with
-        | AstTyKind.Bool -> return Ty.Bool
-        | AstTyKind.Int -> return Ty.Int
+        | AstTyKind.Bool -> return mkTy TyKind.Bool
+        | AstTyKind.Int -> return mkTy TyKind.Int
         | AstTyKind.Tuple(tys) ->
             let! tys = mapM astTyToTy tys
-            return Ty.Tuple tys
+            return mkTy (TyKind.Tuple tys)
         | AstTyKind.Fn(param, ret) ->
             let! paramTy = astTyToTy param
             let! retTy = astTyToTy ret
-            return Ty.Fn(paramTy, retTy)
+            return mkTy <| TyKind.Fn(paramTy, retTy)
         | AstTyKind.Path(_) -> return failwith "Not Implemented"
     }
