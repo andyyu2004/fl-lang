@@ -65,19 +65,5 @@ let recordTy nodeId ty: Tcx<_> =
 
 let probeTyvar var: Tcx<TyVarValue> =
     tcx {
-        printfn "%A" var
         let! tcx = get
-        printfn "%A" <| tcx.Tyvars.ProbeValue var
-        return tcx.Tyvars.ProbeValue var
-    }
-
-/// resolves a type variable
-let rec resolveTy ty =
-    tcx {
-        match ty.Kind with
-        | TyKind.TyVar var ->
-            match! probeTyvar var with
-            | TyVarValue.Known ty' -> return! resolveTy ty'
-            | TyVarValue.Unconstrained -> return ty
-        | _ -> return ty
-    }
+        return tcx.Tyvars.ProbeValue var }

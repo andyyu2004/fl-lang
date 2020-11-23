@@ -7,6 +7,7 @@ open RState
 open TypedAst
 open Ast
 open Error
+open Infer
 
 let rec lowerPat (pat: Pat): Tcx<TPat> =
     tcx {
@@ -14,7 +15,9 @@ let rec lowerPat (pat: Pat): Tcx<TPat> =
                     | PatKind.Tuple(pats) -> TPatKind.Tuple <+> mapM lowerPat pats
                     | PatKind.Bind ident -> tcx { return TPatKind.Bind ident }
         let! patTy = nodeTy pat.Id
-        let! ty = resolveTy patTy
+        printfn "ty: %O" patTy
+        let! ty = fullyResolveTy patTy
+        printfn "fully resolved ty: %O" ty
         return { Id = pat.Id
                  Span = pat.Span
                  Ty = ty
@@ -42,7 +45,7 @@ let rec lowerExpr (expr: Expr): Tcx<TExpr> =
                     | ExprKind.Unary(_, _) -> failwith "Not Implemented"
                     | ExprKind.Bin(_, _, _) -> failwith "Not Implemented"
         let! exprTy = nodeTy expr.Id
-        let! ty = resolveTy exprTy
+        let! ty = fullyResolveTy exprTy
         return { Id = expr.Id
                  Span = expr.Span
                  Ty = ty

@@ -44,3 +44,16 @@ type Equate() =
 
 
 let unify (span: ISpanned) = Equate().RelateTys
+
+/// partially resolves a type variable
+let rec partiallyResolveTy ty =
+    tcx {
+        match ty.Kind with
+        | TyKind.TyVar var ->
+            match! probeTyvar var with
+            | TyVarValue.Known ty' -> return! partiallyResolveTy ty'
+            | TyVarValue.Unconstrained -> return ty
+        | _ -> return ty
+    }
+
+let fullyResolveTy = foldTy partiallyResolveTy

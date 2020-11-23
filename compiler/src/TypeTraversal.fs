@@ -32,8 +32,25 @@ type IRelate =
 
 type TypeFolder = Ty -> Tcx<Ty>
 
-let private foldTyInner (ty: Ty) (f: TypeFolder): Tcx<Ty> =
+
+let rec foldTy (f: TypeFolder) (ty: Ty): Tcx<Ty> =
+    tcx {
+        let! ty = f ty
+        return! foldTyInner f ty }
+
+
+and private foldTyInner f ty: Tcx<Ty> =
     tcx {
         match ty.Kind with
-        | _ -> return failwith ""
+        | TyKind.Tuple(xs) ->
+            let! tys = mapM (foldTy f) xs
+            return mkTy <| TyKind.Tuple tys
+        | TyKind.Fn(t, arg) ->
+            let! t = foldTy f t
+            let! arg = foldTy f arg
+            return mkTy <| TyKind.Fn(t, arg)
+        | TyKind.TyVar(_)
+        | TyKind.Int
+        | TyKind.Bool
+        | TyKind.Err -> return ty
     }

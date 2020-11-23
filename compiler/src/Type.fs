@@ -33,6 +33,9 @@ type TyKind =
 
 and Ty =
     { Kind: TyKind }
+
+    override this.ToString() = show this
+
     interface IShow with
         member this.Show() = show this.Kind
 
