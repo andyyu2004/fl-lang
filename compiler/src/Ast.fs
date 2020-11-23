@@ -87,39 +87,6 @@ type BinOp =
 
 
 [<RequireQualifiedAccess>]
-type ExprKind =
-    | Path of Path
-    | Tuple of list<Expr>
-    | Lit of Lit
-    | Unary of UnOp * Expr
-    | Bin of BinOp * Expr * Expr
-    | App of Expr * Expr
-
-
-    override this.ToString() = show this
-    interface IShow with
-        member this.Show() =
-            match this with
-            | Lit lit -> sprintf "%s" (show lit)
-            | Path path -> sprintf "%s" (show path)
-            | Unary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
-            | Bin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
-            | Tuple(xs) -> sprintf "(%s)" (showList xs ",")
-            | App(f, x) -> sprintf "(%s %s)" (show f) (show x)
-
-and Expr =
-    { Id: NodeId
-      Span: Span
-      Kind: ExprKind }
-
-    interface IShow with
-        member this.Show() = show this.Kind
-
-    interface ISpanned with
-        member this.GetSpan = this.Span
-
-
-[<RequireQualifiedAccess>]
 type PatKind =
     | Bind of Ident
     | Tuple of list<Pat>
@@ -140,9 +107,43 @@ and Pat =
     interface IShow with
         member this.Show() = show this.Kind
 
-(* ast representation of types; not to be confused with `Ty` *)
-// todo
+[<RequireQualifiedAccess>]
+type ExprKind =
+    | Path of Path
+    | Tuple of list<Expr>
+    | Lit of Lit
+    | Unary of UnOp * Expr
+    | Bin of BinOp * Expr * Expr
+    | App of Expr * Expr
+    | Fn of list<Pat> * Expr
 
+
+    override this.ToString() = show this
+    interface IShow with
+        member this.Show() =
+            match this with
+            | Lit lit -> sprintf "%s" (show lit)
+            | Path path -> sprintf "%s" (show path)
+            | Unary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
+            | Bin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
+            | Tuple(xs) -> sprintf "(%s)" (showTuple xs)
+            | App(f, x) -> sprintf "(%s %s)" (show f) (show x)
+            | Fn(args, body) -> sprintf "(fn %s -> %s)" (showTuple args) (show body)
+
+and Expr =
+    { Id: NodeId
+      Span: Span
+      Kind: ExprKind }
+
+    interface IShow with
+        member this.Show() = show this.Kind
+
+    interface ISpanned with
+        member this.GetSpan = this.Span
+
+
+
+(* ast representation of types; not to be confused with `Ty` *)
 [<RequireQualifiedAccess>]
 type AstTyKind =
     | Int

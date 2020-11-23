@@ -8,40 +8,6 @@ open Format
 open Ast
 
 [<RequireQualifiedAccess>]
-type TExprKind =
-    | Var of NodeId
-    | Tuple of list<Expr>
-    | Lit of Lit
-    | Unary of UnOp * TExpr
-    | Bin of BinOp * TExpr * TExpr
-    | App of TExpr * TExpr
-
-
-    override this.ToString() = show this
-    interface IShow with
-        member this.Show() =
-            match this with
-            | Lit lit -> sprintf "%s" (show lit)
-            | Var idx -> sprintf "%s" (show idx)
-            | Unary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
-            | Bin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
-            | Tuple(xs) -> sprintf "(%s)" (showList xs ",")
-            | App(f, x) -> sprintf "(%s %s)" (show f) (show x)
-
-and TExpr =
-    { Id: NodeId
-      Span: Span
-      Ty: Ty
-      Kind: TExprKind }
-
-    interface IShow with
-        member this.Show() = sprintf "%s:%s" (show this.Kind) (show this.Ty)
-
-    interface ISpanned with
-        member this.GetSpan = this.Span
-
-
-[<RequireQualifiedAccess>]
 type TPatKind =
     | Bind of Ident
     | Tuple of list<TPat>
@@ -62,6 +28,43 @@ and TPat =
     override this.ToString() = show this
     interface IShow with
         member this.Show() = sprintf "%s:%s" (show this.Kind) (show this.Ty)
+
+[<RequireQualifiedAccess>]
+type TExprKind =
+    | Var of NodeId
+    | Tuple of list<Expr>
+    | Lit of Lit
+    | Unary of UnOp * TExpr
+    | Bin of BinOp * TExpr * TExpr
+    | App of TExpr * TExpr
+    | Fn of list<TPat> * TExpr
+
+
+    override this.ToString() = show this
+    interface IShow with
+        member this.Show() =
+            match this with
+            | Lit lit -> sprintf "%s" (show lit)
+            | Var idx -> sprintf "%s" (show idx)
+            | Unary(op, expr) -> sprintf "(%s%s)" (show op) (show expr)
+            | Bin(op, l, r) -> sprintf "(%s %s %s)" (show l) (show op) (show r)
+            | Tuple(xs) -> sprintf "(%s)" (showList xs ",")
+            | App(f, x) -> sprintf "(%s %s)" (show f) (show x)
+            | Fn(pats, body) -> sprintf "(fn %s -> %s)" (showList pats " ") (show body)
+
+and TExpr =
+    { Id: NodeId
+      Span: Span
+      Ty: Ty
+      Kind: TExprKind }
+
+    interface IShow with
+        member this.Show() = sprintf "%s:%s" (show this.Kind) (show this.Ty)
+
+    interface ISpanned with
+        member this.GetSpan = this.Span
+
+
 
 type TFnDef =
     { Ident: Ident

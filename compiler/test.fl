@@ -3,3 +3,5 @@
 // let compose f g x = f (g x)
 
 let g f x = f x 8
+
+let f = fn x y -> x

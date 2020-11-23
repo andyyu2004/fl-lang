@@ -271,6 +271,42 @@ let private parseAssoc ops p =
         return! parseAssoc' ops p left }
 
 
+let private mkPat span kind: Parse<Pat> =
+    parse {
+        let! idx = nextId
+        return { Id = idx
+                 Span = span
+                 Kind = kind }
+    }
+
+let rec private parsePat: Parse<Pat> = parsePatBind <|> parsePatGroup <|> parsePatTuple
+
+and parsePatBind =
+    parse {
+        let! name = expectIdent
+        let kind = PatKind.Bind name
+        return! mkPat name.Span kind
+    }
+
+and parsePatGroup =
+    parse {
+        let! l = expect TkLParen
+        let! pat = parsePat
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        return { pat with Span = span }
+    }
+
+and parsePatTuple =
+    parse {
+        let! l = expect TkLParen
+        let! pats = parseTuple parsePat
+        let! r = expect TkRParen
+        let span = l.Span ++ r.Span
+        let kind = PatKind.Tuple pats
+        return! mkPat span kind
+    }
+
 
 let private parseExprPath =
     parse {
@@ -316,9 +352,20 @@ and parseApp' left =
     catch expr left
 
 // note we must parse group before tuple as `( <expr> )` should be parsed as a group not a tuple
-and parsePrimary: Parse<Expr> = parseGroupExpr <|> parseTupleExpr <|> parseExprPath <|> parseLiteralExpr
+and parsePrimary: Parse<Expr> = parseExprLambda <|> parseExprGroup <|> parseExprTuple <|> parseExprPath <|> parseExprLit
 
-and parseTupleExpr =
+and parseExprLambda =
+    parse {
+        let! fn = expect TkFn
+        let! pats = many parsePat
+        do! parseToken TkRArrow
+        let! body = parseExpr
+        let kind = ExprKind.Fn(pats, body)
+        let span = fn.Span ++ body.Span
+        return! mkExpr span kind
+    }
+
+and parseExprTuple =
     parse {
         let! l = expect TkLParen
         let! exprs = parseTuple parseExpr
@@ -328,7 +375,7 @@ and parseTupleExpr =
         return! mkExpr span kind
     }
 
-and parseGroupExpr =
+and parseExprGroup =
     parse {
         let! l = expect TkLParen
         let! expr = parseExpr
@@ -337,7 +384,7 @@ and parseGroupExpr =
         return { expr with Span = span }
     }
 
-and parseLiteralExpr =
+and parseExprLit =
     parse {
         (* let! lit = (parseLiteralInt <|> parseLiteralBool) *)
         let! lit = parseLiteralInt
@@ -347,41 +394,6 @@ and parseLiteralExpr =
     }
 
 
-let private mkPat span kind: Parse<Pat> =
-    parse {
-        let! idx = nextId
-        return { Id = idx
-                 Span = span
-                 Kind = kind }
-    }
-
-let rec private parsePat: Parse<Pat> = parsePatBind <|> parsePatGroup <|> parsePatTuple
-
-and parsePatBind =
-    parse {
-        let! name = expectIdent
-        let kind = PatKind.Bind name
-        return! mkPat name.Span kind
-    }
-
-and parsePatGroup =
-    parse {
-        let! l = expect TkLParen
-        let! pat = parsePat
-        let! r = expect TkRParen
-        let span = l.Span ++ r.Span
-        return { pat with Span = span }
-    }
-
-and parsePatTuple =
-    parse {
-        let! l = expect TkLParen
-        let! pats = parseTuple parsePat
-        let! r = expect TkRParen
-        let span = l.Span ++ r.Span
-        let kind = PatKind.Tuple pats
-        return! mkPat span kind
-    }
 
 (* let private parseFnItem = parse {  } *)
 

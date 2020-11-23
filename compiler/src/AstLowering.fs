@@ -39,9 +39,10 @@ let rec lowerExpr (expr: Expr): Tcx<TExpr> =
                     | ExprKind.Path path -> lowerExprPath path
                     | ExprKind.Tuple(_) -> failwith "Not Implemented"
                     | ExprKind.App(f, arg) -> lowerExprApp f arg
+                    | ExprKind.Fn(pats, body) -> lowerExprLambda pats body
                     | ExprKind.Lit lit -> lowerExprLit lit
-                    | ExprKind.Unary(_, _) -> failwith "Not Implemented"
-                    | ExprKind.Bin(_, _, _) -> failwith "Not Implemented"
+                    | ExprKind.Unary _ -> failwith "Not Implemented"
+                    | ExprKind.Bin(_) -> failwith "Not Implemented"
         let! exprTy = nodeTy expr.Id
         let! ty = fullyResolveTy exprTy
         return { Id = expr.Id
@@ -49,6 +50,12 @@ let rec lowerExpr (expr: Expr): Tcx<TExpr> =
                  Ty = ty
                  Kind = kind }
     }
+
+and lowerExprLambda pats body: Tcx<TExprKind> =
+    tcx {
+        let! pats = mapM lowerPat pats
+        let! body = lowerExpr body
+        return TExprKind.Fn(pats, body) }
 
 and lowerExprApp f arg: Tcx<TExprKind> =
     tcx {

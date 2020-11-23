@@ -56,3 +56,8 @@ type TypeError =
             | Mismatch(expected, found) -> sprintf "expected type `%s`, found `%s`" (show expected) (show found)
 
 type TypeResult<'a> = Result<'a, TypeError>
+
+/// formats the type variables nicely by starting from `a` etc.
+type TypeFormatter =
+    { counter: int
+      map: Map<TyVar, int> }

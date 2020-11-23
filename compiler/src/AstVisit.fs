@@ -78,13 +78,16 @@ type AstVisitor<'s, 'e>() =
         rstate {
             match expr.Kind with
             | ExprKind.Path(path) -> do! this.VisitPath path
+            | ExprKind.Tuple(exprs) -> do! mapM' this.VisitExpr exprs
             | ExprKind.Lit(_lit) -> return ()
             | ExprKind.Unary(_, expr) -> do! this.VisitExpr expr
             | ExprKind.App(lhs, rhs)
             | ExprKind.Bin(_, lhs, rhs) ->
                 do! this.VisitExpr lhs
                 do! this.VisitExpr rhs
-            | ExprKind.Tuple(exprs) -> do! mapM' this.VisitExpr exprs
+            | ExprKind.Fn(pats, body) ->
+                do! mapM' this.VisitPat pats
+                do! this.VisitExpr body
         }
 
     abstract VisitIdent: Ident -> RState<'s, 'e, unit>

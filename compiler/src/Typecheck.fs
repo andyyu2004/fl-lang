@@ -36,6 +36,12 @@ type FnDefCollector() =
             | ItemKind.Sig _ -> return ()
         }
 
+/// converts uncurried type into curried type
+let rec curriedTy (paramTys: list<Ty>) (retTy: Ty): Ty =
+    match paramTys with
+    | [] -> retTy
+    | t :: ts -> mkTy <| TyKind.Fn(t, curriedTy ts retTy)
+
 let checkLit (lit: Lit): Tcx<Ty> =
     tcx {
         match lit.Kind with
@@ -69,11 +75,18 @@ let rec checkExpr (expr: Expr): Tcx<Ty> =
                   | ExprKind.Path path -> checkExprPath expr path
                   | ExprKind.Tuple(_) -> mkTyErr
                   | ExprKind.App(f, arg) -> checkExprApp expr f arg
+                  | ExprKind.Fn(pats, body) -> checkExprLambda expr pats body
                   | ExprKind.Lit(lit) -> checkLit lit
                   | ExprKind.Bin(op, l, r) -> mkTyErr
                   | ExprKind.Unary(_, _) -> mkTyErr
         return! recordTy expr.Id ty
     }
+
+and checkExprLambda expr pats body: Tcx<Ty> =
+    tcx {
+        let! patTys = mapM checkPat pats
+        let! bodyTy = checkExpr body
+        return curriedTy patTys bodyTy }
 
 and checkExprApp expr f arg: Tcx<Ty> =
     tcx {
@@ -83,11 +96,6 @@ and checkExprApp expr f arg: Tcx<Ty> =
         let! _ = unify expr fty <| mkTy (TyKind.Fn(arg, rty))
         return rty }
 
-/// converts uncurried type into curried type
-let rec curriedTy (paramTys: list<Ty>) (retTy: Ty): Ty =
-    match paramTys with
-    | [] -> retTy
-    | t :: ts -> mkTy <| TyKind.Fn(t, curriedTy ts retTy)
 
 type Typechecker() =
     inherit AstVisitor<TyCtxt, TypeError>()

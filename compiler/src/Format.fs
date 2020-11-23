@@ -5,8 +5,11 @@ type IShow =
 
 let show (showable: IShow) = showable.Show()
 
+
 let rec showList showables sep =
     match showables with
     | [] -> ""
     | [ x ] -> show x
     | x :: xs -> sprintf "%s%s%s" (show x) sep (showList xs sep)
+
+let rec showTuple showables = showList showables ","

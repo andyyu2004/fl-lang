@@ -1,5 +1,5 @@
 # FL
 
-Functional Programming Language
+Toy Functional Programming Language implemented in F#.
 
 

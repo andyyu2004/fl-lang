@@ -18,6 +18,7 @@ type TokenKind =
     | TkEOF
     | TkLet
     | TkSig
+    | TkFn
     | TkMinus
     | TkStar
     | TkSlash
@@ -28,6 +29,7 @@ type TokenKind =
 let keywords =
     Map
         [ ("let", TkLet)
+          ("fn", TkFn)
           ("sig", TkSig) ]
 
 type Token =

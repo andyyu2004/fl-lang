@@ -26,8 +26,6 @@ let unifyTyVars x y: Tcx<Ty> =
         return mkTy (TyKind.TyVar x)
     }
 
-
-
 let rec equateRelation s t =
     tcx {
         if s = t then
