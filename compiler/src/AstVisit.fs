@@ -2,64 +2,64 @@ module AstVisit
 
 open Span
 open Ast
-open State
+open RState
 
 [<AbstractClass>]
-type AstVisitor<'s>() =
+type AstVisitor<'s, 'e>() =
 
-    abstract VisitAst: Ast -> State<'s, unit>
+    abstract VisitAst: Ast -> RState<'s, 'e, unit>
 
     default this.VisitAst ast = this.WalkAst ast
 
     member this.WalkAst ast = mapM' this.VisitItem ast.Items
 
 
-    abstract VisitItem: Item -> State<'s, unit>
+    abstract VisitItem: Item -> RState<'s, 'e, unit>
 
     default this.VisitItem item = this.WalkItem item
 
     member this.WalkItem item =
-        state {
+        rstate {
             match item.Kind with
             | ItemKind.FnDef def -> do! this.VisitFnDef def
             | ItemKind.Sig fnsig -> do! this.VisitFnSig fnsig
         }
 
-    abstract VisitFnSig: FnSig -> State<'s, unit>
+    abstract VisitFnSig: FnSig -> RState<'s, 'e, unit>
 
     default this.VisitFnSig fnsig =
-        state {
+        rstate {
             do! this.VisitIdent fnsig.Ident
             do! this.VisitTy fnsig.Type
         }
 
-    abstract VisitFnDef: FnDef -> State<'s, unit>
+    abstract VisitFnDef: FnDef -> RState<'s, 'e, unit>
 
     default this.VisitFnDef def = this.WalkFnDef def
 
     member this.WalkFnDef def =
-        state {
+        rstate {
             do! this.VisitIdent def.Ident
             do! mapM' this.VisitPat def.Params
             do! this.VisitExpr def.Body
         }
 
-    abstract VisitPat: Pat -> State<'s, unit>
+    abstract VisitPat: Pat -> RState<'s, 'e, unit>
 
 
     default this.VisitPat pat = this.WalkPat pat
 
     member this.WalkPat pat =
-        state {
+        rstate {
             match pat.Kind with
             | PatKind.Bind ident -> do! this.VisitIdent ident
             | PatKind.Tuple(pats) -> do! mapM' this.VisitPat pats
         }
 
-    abstract VisitTy: AstTy -> State<'s, unit>
+    abstract VisitTy: AstTy -> RState<'s, 'e, unit>
 
     default this.VisitTy ty =
-        state {
+        rstate {
             match ty.Kind with
             | AstTyKind.Bool
             | AstTyKind.Int -> return ()
@@ -70,12 +70,12 @@ type AstVisitor<'s>() =
                 do! this.VisitTy ret
         }
 
-    abstract VisitExpr: Expr -> State<'s, unit>
+    abstract VisitExpr: Expr -> RState<'s, 'e, unit>
 
     default this.VisitExpr expr = this.WalkExpr expr
 
     member this.WalkExpr expr =
-        state {
+        rstate {
             match expr.Kind with
             | ExprKind.Path(path) -> do! this.VisitPath path
             | ExprKind.Lit(_lit) -> return ()
@@ -87,11 +87,11 @@ type AstVisitor<'s>() =
             | ExprKind.Tuple(exprs) -> do! mapM' this.VisitExpr exprs
         }
 
-    abstract VisitIdent: Ident -> State<'s, unit>
-    default _this.VisitIdent _ident = state { return () }
+    abstract VisitIdent: Ident -> RState<'s, 'e, unit>
+    default _this.VisitIdent _ident = rstate { return () }
 
-    abstract VisitPathSegment: PathSegment -> State<'s, unit>
+    abstract VisitPathSegment: PathSegment -> RState<'s, 'e, unit>
     default this.VisitPathSegment segment = this.VisitIdent segment.Ident
 
-    abstract VisitPath: Path -> State<'s, unit>
+    abstract VisitPath: Path -> RState<'s, 'e, unit>
     default this.VisitPath path = mapM' this.VisitPathSegment path.Segments

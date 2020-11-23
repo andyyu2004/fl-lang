@@ -1,6 +1,7 @@
 module Parse
 
 open Result
+open RState
 open Span
 open Format
 open Ast
@@ -18,79 +19,22 @@ type ParseCtxt =
       IdCounter: int }
 
 
-(* note the parsectxt is outside the result, so is returned on both error and success *)
-type Parse<'a> = P of (ParseCtxt -> (Result<'a, ParseError> * ParseCtxt))
+type Parse<'a> = RState<ParseCtxt, ParseError, 'a>
 
-let runParser (P f) tokens = f tokens
+let runParser (R f) tokens = f tokens
 
 let (>>=) x f = bind f x
 
-let private error err = P(fun pcx -> (Error err, pcx))
+let private error err = R(fun pcx -> (Error err, pcx))
 
 
-module private Parsers =
-    let ret t = P(fun pcx -> (Ok t, pcx))
+let parse = rstate
 
-    let bind (P p) f =
-        P(fun pcx ->
-                let (r, pcx') = p pcx
-                match r with
-                | Ok t -> runParser (f t) pcx'
-                | Error err -> (Error err, pcx'))
-
-    (* >>= (fun (t, pcx') -> let (P q) = f t in q pcx')) *)
-
-
-    (* sequence (>>) in haskell *)
-    let combine p q = bind p (fun _ -> q)
-
-    let zero() = P(fun ctx -> (Error ParseError, ctx))
-
-
-type ParserBuilder() =
-    member _x.Return t = Parsers.ret t
-    member _x.ReturnFrom(p) = p
-    member _x.Bind(t, f) = Parsers.bind t f
-    member _x.Zero() = Parsers.zero()
-    member _x.Combine(p, q) = Parsers.combine p q
-    member _x.Delay(f) =
-        P(fun src -> let (P g) = f() in g src)
-
-let private parse = ParserBuilder()
-
-let (<*>) f x =
-    parse {
-        let! f = f
-        let! x = x
-        return f x }
-
-(* combinators *)
-
-
-(* let integer = P(fun src -> ) *)
-
-
-/// the `or` parser combinator
-// note the intentional choice return `q pctx` instead of `q pctx'`
-// on error
-// this allows this combinator to be used as a backtrack over multiple options
-let (<|>) (P p) (P q) =
-    P(fun pcx ->
-            match p pcx with
-            | (Ok a, pcx') -> (Ok a, pcx')
-            | (Error _, _pctx') -> q pcx)
 
 let (>*>) p q =
     parse {
         let! _ = p
         return! q }
-
-let catch (P p) t =
-    P(fun pcx ->
-            match p pcx with
-            | (Error _, _pcx) -> (Ok t, pcx)
-            | (Ok a, pcx') -> (Ok a, pcx'))
-
 
 let rec private many1 p: Parse<list<'a>> =
     parse {
@@ -98,7 +42,7 @@ let rec private many1 p: Parse<list<'a>> =
         let! xs = many p
         return x :: xs }
 
-and private many p: Parse<list<'a>> = many1 p <|> Parsers.ret []
+and private many p: Parse<list<'a>> = many1 p <|> parse.Return []
 
 /// parsers `p` if it can; always returns ()
 let optional p: Parse<unit> =
@@ -107,7 +51,7 @@ let optional p: Parse<unit> =
         return () } <|> parse { return () }
 
 
-let rec private sepBy p sep = sepBy1 p sep <|> parse { return [] }
+let rec private sepBy p sep = sepBy1 p sep <|> parse.Return []
 
 and private sepBy1 p sep =
     parse {
@@ -120,7 +64,7 @@ and private sepBy1 p sep =
 
 let rec private sequence =
     function
-    | [] -> Parsers.ret []
+    | [] -> parse.Return []
     | p :: ps ->
         parse {
             let! x = p
@@ -134,9 +78,6 @@ let private map f p =
 
 (* parsing logic *)
 
-let get = P(fun pcx -> (Ok pcx, pcx))
-let put pcx = P(fun _ -> (Ok(), pcx))
-
 
 let private next: Parse<Token> =
     parse {
@@ -149,7 +90,7 @@ let private next: Parse<Token> =
     }
 
 
-let private accept kind: Parse<Option<Token>> =
+let private accept kind: Parse<option<Token>> =
     parse {
         let! pcx = get
         match pcx.Tokens with
@@ -163,7 +104,7 @@ let private accept kind: Parse<Option<Token>> =
     }
 
 
-let rec private acceptOneOf kinds: Parse<Option<Token>> =
+let rec private acceptOneOf kinds: Parse<option<Token>> =
     parse {
         match kinds with
         | [] -> return None
@@ -188,7 +129,7 @@ let private nextId: Parse<NodeId> =
         return { Id = idx }
     }
 
-let private acceptIdent: Parse<Option<Ident>> =
+let private acceptIdent: Parse<option<Ident>> =
     parse {
         let! token = next
         match token.Kind with
@@ -210,7 +151,7 @@ let private expectIdent =
         | None -> return! error ParseError
     }
 
-let private acceptInt: Parse<Option<Span * int>> =
+let private acceptInt: Parse<option<Span * int>> =
     parse {
         let! token = next
         match token.Kind with

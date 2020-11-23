@@ -1,25 +1,70 @@
 module Infer
 
+open Span
 open Type
-open State
-open TypeContext
+open RState
 open Unify
+open TypeContext
 
-type Tyvid = int
+let newTyvar: Tcx<Ty> =
+    tcx {
+        let! tcx = get
+        return Ty.TyVar(tcx.Tyvars.NewKey TyVarValue.Unconstrained) }
 
-type InferCtxt =
-    { Tcx: TyCtxt
-      Tyvars: UnificationTable<Ty> }
+let instantiate tyvid ty: Tcx<Ty> =
+    tcx {
+        let! tcx = get
+        tcx.Tyvars.UnifyKV tyvid (TyVarValue.Known ty)
+        return ty
+    }
 
-    static member New tcx =
-        { Tyvars = UnificationTable()
-          Tcx = tcx }
+let unifyTyVars x y: Tcx<Ty> =
+    tcx {
+        let! tcx = get
+        tcx.Tyvars.Union x y
+        return Ty.TyVar x
+    }
 
 
-let withInferCtxt tcx f = InferCtxt.New tcx |> f
 
-type Infcx<'a> = State<'a, InferCtxt>
+[<AbstractClass>]
+type IRelation() =
+    abstract RelateTys: Ty -> Ty -> Tcx<Ty>
 
-let infcx = state
+    member this.RelateTysInner s t =
+        assert (s <> t)
+        tcx {
+            match (s, t) with
+            | (Ty.Tuple(xs), Ty.Tuple(ys)) ->
+                let! ts = List.zip xs ys
+                          |> List.map (fun (x, y) -> this.RelateTys x y)
+                          |> sequence
+                return Ty.Tuple(ts)
+            | (Ty.Fn(fl, rl), Ty.Fn(fr, rr)) ->
+                let! f = this.RelateTys fl fr
+                let! r = this.RelateTys rl rr
+                return Ty.Fn(f, r)
+            | _ -> return Ty.Err
+            return s
+        }
 
-let unify s t = infcx { failwith "" }
+type IRelate =
+    abstract Relate: IRelation -> IRelate -> IRelate -> Tcx<IRelate>
+
+type Equate() =
+    inherit IRelation()
+    override this.RelateTys s t =
+        tcx {
+            if s = t then
+                return s
+            else
+                match (s, t) with
+                | (Ty.TyVar x, Ty.TyVar y) -> return! unifyTyVars x y
+                | (Ty.TyVar x, _) -> return! instantiate x t
+                | (_, Ty.TyVar y) -> return! instantiate y s
+                | _ -> return! this.RelateTysInner s t
+        }
+
+
+
+let unify (span: ISpanned) = Equate().RelateTys

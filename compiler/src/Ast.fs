@@ -7,8 +7,15 @@ open Span
 type NodeId =
     { Id: int }
 
+    override this.ToString() = show this
+
+    interface IShow with
+        member this.Show() = sprintf "%%%d" this.Id
+
 type PathSegment =
     { Ident: Ident }
+
+    override this.ToString() = show this
 
     interface IShow with
         member this.Show() = show this.Ident
@@ -18,6 +25,7 @@ type Path =
     { Span: Span
       Id: NodeId
       Segments: list<PathSegment> }
+    override this.ToString() = show this
     interface IShow with
         member this.Show() = showList this.Segments "::"
 
@@ -47,6 +55,7 @@ type UnOp =
         | TkBang -> UnOpNot
         | _ -> failwith "invalid unop"
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() =
             match this with
@@ -67,6 +76,7 @@ type BinOp =
         | TkSlash -> BinOpDiv
         | _ -> failwith "invalid binop"
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() =
             match this with
@@ -78,14 +88,15 @@ type BinOp =
 
 [<RequireQualifiedAccess>]
 type ExprKind =
-    | Lit of Lit
     | Path of Path
+    | Tuple of list<Expr>
+    | Lit of Lit
     | Unary of UnOp * Expr
     | Bin of BinOp * Expr * Expr
-    | Tuple of list<Expr>
     | App of Expr * Expr
 
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() =
             match this with
@@ -104,12 +115,16 @@ and Expr =
     interface IShow with
         member this.Show() = show this.Kind
 
+    interface ISpanned with
+        member this.GetSpan = this.Span
+
 
 [<RequireQualifiedAccess>]
 type PatKind =
     | Bind of Ident
     | Tuple of list<Pat>
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() =
             match this with
@@ -121,6 +136,7 @@ and Pat =
       Span: Span
       Kind: PatKind }
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() = show this.Kind
 
@@ -135,6 +151,7 @@ type AstTyKind =
     | Path of Path
     | Fn of AstTy * AstTy
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() =
             match this with
@@ -149,6 +166,7 @@ and AstTy =
       Span: Span
       Kind: AstTyKind }
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() = show this.Kind
 
@@ -157,6 +175,7 @@ type FnSig =
     { Ident: Ident
       Type: AstTy }
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() = sprintf "sig %s :: %s" (show this.Ident) (show this.Type)
 
@@ -164,6 +183,7 @@ type FnDef =
     { Ident: Ident
       Params: list<Pat>
       Body: Expr }
+    override this.ToString() = show this
     interface IShow with
         member this.Show() =
             // need two cases to get the spacing correct
@@ -178,6 +198,7 @@ type ItemKind =
     | FnDef of FnDef
     | Sig of FnSig
 
+    override this.ToString() = show this
     interface IShow with
         member this.Show() =
             match this with
@@ -190,12 +211,19 @@ type Item =
       Span: Span
       Kind: ItemKind }
 
+    override this.ToString() = show this
+
     interface IShow with
         member this.Show() = show this.Kind
+
+    interface ISpanned with
+        member this.GetSpan = this.Span
 
 
 type Ast =
     { Items: list<Item> }
+
+    override this.ToString() = show this
 
     interface IShow with
         member this.Show() = showList this.Items "\n"

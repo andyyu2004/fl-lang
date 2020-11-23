@@ -7,8 +7,8 @@
 
   <ItemGroup>
     <Compile Include="src/Format.fs" />
-    <Compile Include="src/Result.fs" />
     <Compile Include="src/State.fs" />
+    <Compile Include="src/RState.fs" />
     <Compile Include="src/Span.fs" />
     <Compile Include="src/Error.fs" />
     <Compile Include="src/Lex.fs" />
@@ -17,10 +17,12 @@
     <Compile Include="src/Parse.fs" />
     <Compile Include="src/Resolve.fs" />
     <Compile Include="src/Type.fs" />
+    <Compile Include="src/TypedAst.fs" />
     <Compile Include="src/Unify.fs" />
-    <Compile Include="src/TypeLowering.fs" />
     <Compile Include="src/TypeContext.fs" />
     <Compile Include="src/Infer.fs" />
+    <Compile Include="src/TypeLowering.fs" />
+    <Compile Include="src/AstLowering.fs" />
     <Compile Include="src/Typecheck.fs" />
     <Compile Include="src/Eval.fs" />
 

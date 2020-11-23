@@ -1,26 +1,29 @@
 module Resolve
 
-open Result
 open Error
 open Ast
 open Span
 open Format
 open AstVisit
-open State
+open RState
 
-let resolve = state
+let resolve = rstate
 
 [<RequireQualifiedAccess>]
 type Res =
     | Local of NodeId
     | Err
 
+
 type Resolutions =
-    { Resolutions: Map<NodeId, Res> }
+    { NodeResolutions: Map<NodeId, Res>
+      SigToDef: Map<NodeId, NodeId> }
 
-    member this.RecordRes idx res = { this with Resolutions = this.Resolutions.Add(idx, res) }
+    member this.RecordRes idx res = { this with NodeResolutions = this.NodeResolutions.Add(idx, res) }
 
-    static member Default = { Resolutions = Map [] }
+    static member Default =
+        { NodeResolutions = Map []
+          SigToDef = Map [] }
 
 type Scope =
     { Bindings: Map<Symbol, NodeId>
@@ -59,8 +62,15 @@ type ResolveCtxt =
           Scope = Scope.Default
           Items = Map [] }
 
+type ResolutionError =
+    | ResolutionError
+    interface IShow with
+        member _.Show() = ""
+
+type Resolve<'a> = RState<ResolveCtxt, ResolutionError, 'a>
+
 type ItemCollector() =
-    inherit AstVisitor<ResolveCtxt>()
+    inherit AstVisitor<ResolveCtxt, ResolutionError>()
 
     override _this.VisitItem item =
         resolve {
@@ -72,7 +82,6 @@ type ItemCollector() =
             | ItemKind.Sig(_) -> return ()
         }
 
-type Resolve<'a> = State<ResolveCtxt, 'a>
 
 let scope =
     resolve {
@@ -146,7 +155,7 @@ let declareBinding ident idx =
     }
 
 type LateResolver() =
-    inherit AstVisitor<ResolveCtxt>()
+    inherit AstVisitor<ResolveCtxt, ResolutionError>()
 
     override this.VisitFnDef def = withScope <| this.WalkFnDef def
 
@@ -164,7 +173,7 @@ type LateResolver() =
         }
 
 
-let runResolver = runState
+let runResolver = runRState
 
 let resolveAst (ast: Ast): Resolve<Resolutions> =
     resolve {
@@ -174,4 +183,4 @@ let resolveAst (ast: Ast): Resolve<Resolutions> =
         return rcx.Resolutions
     }
 
-let runResolveAst (ast: Ast): Resolutions = runResolver (resolveAst ast) ResolveCtxt.Default |> fst
+let runResolveAst (ast: Ast) = runResolver (resolveAst ast) ResolveCtxt.Default |> fst
