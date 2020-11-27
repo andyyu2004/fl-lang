@@ -124,7 +124,8 @@ type Typechecker() =
                 let! sigTy = nodeTy item.Id
                 do! unify item.Span sigTy fnTy
 
-                printfn "%s :: %s" (show def.Ident) (show fnTy)
+                let! resolvedTy = fullyResolveTy fnTy
+                printfn "%s :: %s" (show def.Ident) (show resolvedTy)
                 return ()
             | ItemKind.Sig _ -> return ()
         }

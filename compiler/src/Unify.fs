@@ -82,6 +82,8 @@ type UnificationTable() =
                 }
 
             kvs
-            |> Seq.mapi (fun i kv -> sprintf "τ%d = %s" i (show (this.ProbeValue kv.Key)))
+            |> Seq.mapi (fun i kv ->
+                sprintf "\n\tτ%d = %s" i
+                <| show (this.ProbeValue kv.Key))
             |> fun xs -> String.Join(";", Seq.toArray xs)
-            |> sprintf "%s"
+            |> sprintf "UnificationTable { %s }"
