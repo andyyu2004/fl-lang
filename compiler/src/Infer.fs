@@ -39,7 +39,10 @@ let rec equateRelation s t =
     }
 
 // TODO check for errors? with catch?
-let unify (span: ISpanned) = equateRelation
+let unify (span: ISpanned) expected ty =
+    tcx {
+        let! _ = equateRelation expected ty
+        return () }
 
 /// partially resolves a type variable
 let rec partiallyResolveTy ty =

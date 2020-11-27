@@ -112,6 +112,7 @@ type ExprKind =
     | Path of Path
     | Tuple of list<Expr>
     | Lit of Lit
+    | Let of Pat * Expr * Expr
     | Unary of UnOp * Expr
     | Bin of BinOp * Expr * Expr
     | App of Expr * Expr
@@ -129,6 +130,8 @@ type ExprKind =
             | Tuple(xs) -> sprintf "(%s)" (showTuple xs)
             | App(f, x) -> sprintf "(%s %s)" (show f) (show x)
             | Fn(args, body) -> sprintf "(fn %s -> %s)" (showTuple args) (show body)
+            | Let(pat, expr, body) ->
+                sprintf "let %s = %s in\n%s" (show pat) (show expr) (show body)
 
 and Expr =
     { Id: NodeId

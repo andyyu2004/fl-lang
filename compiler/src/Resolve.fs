@@ -17,13 +17,15 @@ type Res =
 
 type Resolutions =
     { NodeResolutions: Map<NodeId, Res>
-      SigToDef: Map<NodeId, NodeId> }
+      Signatures: Map<Ident, NodeId>
+      DefToSig: Map<NodeId, NodeId> }
 
     member this.RecordRes idx res = { this with NodeResolutions = this.NodeResolutions.Add(idx, res) }
 
     static member Default =
         { NodeResolutions = Map []
-          SigToDef = Map [] }
+          DefToSig = Map []
+          Signatures = Map [] }
 
 type Scope =
     { Bindings: Map<Symbol, NodeId>
@@ -37,7 +39,6 @@ type Scope =
               Bindings = Map [] }
 
     member this.Exit = this.Parent.Value
-
 
     member this.Lookup ident =
         match this.Bindings.TryFind ident with
@@ -54,13 +55,11 @@ type Scope =
 [<NoEquality; NoComparison>]
 type ResolveCtxt =
     { Resolutions: Resolutions
-      Items: Map<Ident, NodeId>
       Scope: Scope }
 
     static member Default =
         { Resolutions = Resolutions.Default
-          Scope = Scope.Default
-          Items = Map [] }
+          Scope = Scope.Default }
 
 type ResolutionError =
     | ResolutionError
@@ -69,18 +68,6 @@ type ResolutionError =
 
 type Resolve<'a> = RState<ResolveCtxt, ResolutionError, 'a>
 
-type ItemCollector() =
-    inherit AstVisitor<ResolveCtxt, ResolutionError>()
-
-    override _this.VisitItem item =
-        resolve {
-            // note we only consider the definition as the signature is optional
-            match item.Kind with
-            | ItemKind.FnDef def ->
-                let! rcx = get
-                do! put <| { rcx with Items = rcx.Items.Add(def.Ident, item.Id) }
-            | ItemKind.Sig(_) -> return ()
-        }
 
 
 let scope =
@@ -146,6 +133,15 @@ let resolvePath path =
         return! recordRes path.Id res
     }
 
+let declareSignature ident idx =
+    resolve {
+        printfn "sdfsd"
+        let! rcx = get
+        let sigs = rcx.Resolutions.Signatures.Add(ident, idx)
+        let resolutions = { rcx.Resolutions with Signatures = sigs }
+        do! put { rcx with Resolutions = resolutions }
+    }
+
 let declareBinding ident idx =
     resolve {
         let! rcx = get
@@ -154,14 +150,31 @@ let declareBinding ident idx =
         do! put { rcx with Scope = scope }
     }
 
+type ItemCollector() =
+    inherit AstVisitor<ResolveCtxt, ResolutionError>()
+
+    override this.VisitItem item =
+        resolve {
+            // note we only consider the definition as the signature is optional
+            match item.Kind with
+            | ItemKind.FnDef def -> do! declareBinding def.Ident.Symbol item.Id
+            | ItemKind.Sig(fnsig) ->
+                do! declareSignature fnsig.Ident item.Id
+                do! this.WalkFnSig fnsig
+        }
+
 type LateResolver() =
     inherit AstVisitor<ResolveCtxt, ResolutionError>()
 
-    override this.VisitFnDef def = withScope <| this.WalkFnDef def
+    // we create a new scope so the item types are never overwritten
+    override this.VisitAst ast = this.WalkAst ast |> withScope
+
+    override this.VisitFnDef def = this.WalkFnDef def |> withScope
 
     override this.VisitExpr expr =
         match expr.Kind with
         | ExprKind.Path path -> resolvePath path
+        | ExprKind.Let _ -> this.WalkExpr expr |> withScope
         | _ -> this.WalkExpr expr
 
     override this.VisitPat pat =

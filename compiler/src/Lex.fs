@@ -11,6 +11,7 @@ type TokenKind =
     | TkEq
     | TkLParen
     | TkRParen
+    | TkIn
     | TkRArrow
     | TkRFArrow
     | TkDColon
@@ -30,6 +31,7 @@ let keywords =
     Map
         [ ("let", TkLet)
           ("fn", TkFn)
+          ("in", TkIn)
           ("sig", TkSig) ]
 
 type Token =

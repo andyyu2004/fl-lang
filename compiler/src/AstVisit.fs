@@ -27,7 +27,9 @@ type AstVisitor<'s, 'e>() =
 
     abstract VisitFnSig: FnSig -> RState<'s, 'e, unit>
 
-    default this.VisitFnSig fnsig =
+    default this.VisitFnSig fnsig = this.WalkFnSig fnsig
+
+    member this.WalkFnSig fnsig =
         rstate {
             do! this.VisitIdent fnsig.Ident
             do! this.VisitTy fnsig.Type
@@ -81,6 +83,10 @@ type AstVisitor<'s, 'e>() =
             | ExprKind.Tuple(exprs) -> do! mapM' this.VisitExpr exprs
             | ExprKind.Lit(_lit) -> return ()
             | ExprKind.Unary(_, expr) -> do! this.VisitExpr expr
+            | ExprKind.Let(pat, expr, body) ->
+                do! this.VisitPat pat
+                do! this.VisitExpr expr
+                do! this.VisitExpr body
             | ExprKind.App(lhs, rhs)
             | ExprKind.Bin(_, lhs, rhs) ->
                 do! this.VisitExpr lhs

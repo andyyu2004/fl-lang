@@ -2,6 +2,11 @@
 
 // let compose f g x = f (g x)
 
-let g f x = f x 8
+// let g f x = f x 8
 
-let f = fn x y -> x
+// let k = fn f -> let x = 5 in f x
+
+let g x = x
+
+let id = g
+

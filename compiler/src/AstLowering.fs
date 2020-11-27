@@ -40,6 +40,7 @@ let rec lowerExpr (expr: Expr): Tcx<TExpr> =
                     | ExprKind.Tuple(_) -> failwith "Not Implemented"
                     | ExprKind.App(f, arg) -> lowerExprApp f arg
                     | ExprKind.Fn(pats, body) -> lowerExprLambda pats body
+                    | ExprKind.Let(pat, expr, body) -> lowerExprLet pat expr body
                     | ExprKind.Lit lit -> lowerExprLit lit
                     | ExprKind.Unary _ -> failwith "Not Implemented"
                     | ExprKind.Bin(_) -> failwith "Not Implemented"
@@ -50,6 +51,13 @@ let rec lowerExpr (expr: Expr): Tcx<TExpr> =
                  Ty = ty
                  Kind = kind }
     }
+
+and lowerExprLet pat expr body: Tcx<TExprKind> =
+    tcx {
+        let! pat = lowerPat pat
+        let! expr = lowerExpr expr
+        let! body = lowerExpr body
+        return TExprKind.Let(pat, expr, body) }
 
 and lowerExprLambda pats body: Tcx<TExprKind> =
     tcx {

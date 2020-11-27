@@ -352,7 +352,20 @@ and parseApp' left =
     catch expr left
 
 // note we must parse group before tuple as `( <expr> )` should be parsed as a group not a tuple
-and parsePrimary: Parse<Expr> = parseExprLambda <|> parseExprGroup <|> parseExprTuple <|> parseExprPath <|> parseExprLit
+and parsePrimary: Parse<Expr> =
+    parseExprLambda <|> parseExprLet <|> parseExprGroup <|> parseExprTuple <|> parseExprPath <|> parseExprLit
+
+and parseExprLet: Parse<Expr> =
+    parse {
+        let! let_kw = expect TkLet
+        let! pat = parsePat
+        do! parseToken TkEq
+        let! bind = parseExpr
+        do! parseToken TkIn
+        let! body = parseExpr
+        let span = let_kw.Span ++ body.Span
+        return! mkExpr span <| ExprKind.Let(pat, bind, body)
+    }
 
 and parseExprLambda =
     parse {

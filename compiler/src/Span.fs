@@ -6,12 +6,16 @@ type Span =
     { Lo: int
       Hi: int }
 
+    interface ISpanned with
+        member this.GetSpan = this
+
+and ISpanned =
+    abstract GetSpan: Span
+
 let (++) s t =
     { Lo = min s.Lo t.Lo
       Hi = max s.Hi t.Hi }
 
-type ISpanned =
-    abstract GetSpan: Span
 
 
 type Symbol = string

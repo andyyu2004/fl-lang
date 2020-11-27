@@ -34,6 +34,7 @@ type TExprKind =
     | Var of NodeId
     | Tuple of list<Expr>
     | Lit of Lit
+    | Let of TPat * TExpr * TExpr
     | Unary of UnOp * TExpr
     | Bin of BinOp * TExpr * TExpr
     | App of TExpr * TExpr
@@ -51,6 +52,8 @@ type TExprKind =
             | Tuple(xs) -> sprintf "(%s)" (showList xs ",")
             | App(f, x) -> sprintf "(%s %s)" (show f) (show x)
             | Fn(pats, body) -> sprintf "(fn %s -> %s)" (showList pats " ") (show body)
+            | Let(pat, expr, body) ->
+                sprintf "let %s = %s in\n%s" (show pat) (show expr) (show body)
 
 and TExpr =
     { Id: NodeId

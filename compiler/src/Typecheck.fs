@@ -31,8 +31,12 @@ type FnDefCollector() =
         tcx {
             match item.Kind with
             | ItemKind.FnDef _ ->
-                let! tyvar = newTyvar
-                do! recordSig item.Id tyvar
+                match! nodeTyOpt item.Id with
+                | Some _ -> return ()
+                | None ->
+                    // assign an inference variable to the item if no explicit signature
+                    let! tyvar = newTyvar
+                    do! recordSig item.Id tyvar
             | ItemKind.Sig _ -> return ()
         }
 
@@ -76,10 +80,20 @@ let rec checkExpr (expr: Expr): Tcx<Ty> =
                   | ExprKind.Tuple(_) -> mkTyErr
                   | ExprKind.App(f, arg) -> checkExprApp expr f arg
                   | ExprKind.Fn(pats, body) -> checkExprLambda expr pats body
+                  | ExprKind.Let(pat, bind, body) -> checkExprLet expr pat bind body
                   | ExprKind.Lit(lit) -> checkLit lit
                   | ExprKind.Bin(op, l, r) -> mkTyErr
                   | ExprKind.Unary(_, _) -> mkTyErr
         return! recordTy expr.Id ty
+    }
+
+and checkExprLet expr pat bind body: Tcx<Ty> =
+    tcx {
+        let! patTy = checkPat pat
+        let! exprTy = checkExpr bind
+        do! unify expr patTy exprTy
+        let! bodyTy = checkExpr body
+        return bodyTy
     }
 
 and checkExprLambda expr pats body: Tcx<Ty> =
@@ -93,8 +107,9 @@ and checkExprApp expr f arg: Tcx<Ty> =
         let! fty = checkExpr f
         let! arg = checkExpr arg
         let! rty = newTyvar
-        let! _ = unify expr fty <| mkTy (TyKind.Fn(arg, rty))
-        return rty }
+        do! unify expr fty <| mkTy (TyKind.Fn(arg, rty))
+        return rty
+    }
 
 
 type Typechecker() =
@@ -106,6 +121,9 @@ type Typechecker() =
                 let! paramTys = mapM checkPat def.Params
                 let! bodyTy = checkExpr def.Body
                 let fnTy = curriedTy paramTys bodyTy
+                let! sigTy = nodeTy item.Id
+                do! unify item.Span sigTy fnTy
+
                 printfn "%s :: %s" (show def.Ident) (show fnTy)
                 return ()
             | ItemKind.Sig _ -> return ()

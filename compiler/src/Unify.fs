@@ -25,9 +25,6 @@ type KeyValue =
           Value = value
           Rank = 0 }
 
-    interface IShow with
-        member this.Show() = sprintf "%s = %s" (show this.Key) (show this.Value)
-
 type UnificationTable() =
 
     let mutable storage = ResizeArray<KeyValue>()
@@ -77,10 +74,14 @@ type UnificationTable() =
     override this.ToString() = show this
 
     interface IShow with
-        member _.Show() =
-            let strs =
+        member this.Show() =
+            let kvs =
                 query {
                     for kv in storage do
-                        select (show kv)
+                        select kv
                 }
-            sprintf "{ %s }" <| String.Join("; ", Seq.toArray strs)
+
+            kvs
+            |> Seq.mapi (fun i kv -> sprintf "τ%d = %s" i (show (this.ProbeValue kv.Key)))
+            |> fun xs -> String.Join(";", Seq.toArray xs)
+            |> sprintf "%s"
